@@ -15,6 +15,9 @@ jobs:
       TOKEN: ${{ secrets.TOKEN }}
       USERNAME: "apoorv-katiyar"
       EMAILID: "katiyar.apoorv97@gmail.com"
+      NEXUS_URL: ${{ secrets.NEXUS_URL }}
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
     permissions:
       contents: write
@@ -27,13 +30,41 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '18'
 
-      - name: Install Global Tools
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y openjdk-11-jdk jq curl gh
+          sudo apt-get install -y \
+            openjdk-11-jdk \
+            maven \
+            gradle \
+            jq \
+            curl \
+            gh \
+            docker.io
+
+      - name: Install Node.js Global Tools
+        run: |
           npm install -g npm-check-updates
+
+      - name: Install Python Tools
+        run: |
+          pip install --upgrade pip
+          pip install pip-tools pytest poetry
 
       - name: Configure Git
         run: |
@@ -43,14 +74,26 @@ jobs:
       - name: Run Dependency Updater Script
         env:
           GH_TOKEN: ${{ secrets.TOKEN }}
+          NEXUS_URL: ${{ secrets.NEXUS_URL }}
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
         run: |
           echo "Running Dependency Updater Script..."
-          bash dependency-updater.sh || {
+          bash dependency-updater.sh 2>&1 | tee dependency-updater.log || {
             echo "❌ Error occurred while running dependency-updater.sh. Check the log below."
-            cat dependency-updater.log || echo "No log file found."
+            cat dependency-updater.log
             exit 1
           }
           echo "✅ Dependency update completed successfully."
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-updater-logs
+          path: |
+            dependency-updater.log
+            changelog.txt
 
       - name: Review results if failed
         if: failure()

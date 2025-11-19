@@ -1,0 +1,34 @@
+{
+  "owner_name": "DevOps-Busters",
+  "template_name": "Dependency Updater Template",
+  "description": "Automated multi-language dependency updater for GitHub repositories with security audits, parallel execution, and interactive CLI",
+  "readme": "README.md",
+  "documentation": {
+    "quickstart": "QUICKSTART.sh",
+    "template_guide": "TEMPLATE.md",
+    "github_docs": ".github/TEMPLATE_README.md"
+  },
+  "include": [
+    "dependency-updater-main.sh",
+    "cli.sh",
+    "modules/",
+    ".github/workflows/",
+    "README.md",
+    "QUICKSTART.sh",
+    ".gitignore"
+  ],
+  "customization": {
+    "config_file": "~/.dependency-updater.config",
+    "workflow_file": ".github/workflows/auto-update.yaml"
+  },
+  "features": [
+    "Security Audits",
+    "Parallel Execution",
+    "Interactive CLI",
+    "Dependency Reports",
+    "Monorepo Support",
+    "Conflict Resolution",
+    "PR Automation",
+    "7 Languages"
+  ]
+}
