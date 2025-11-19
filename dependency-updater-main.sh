@@ -1,15 +1,15 @@
 #!/bin/bash
 
 ################################################################################
-# Dependency Updater - Main Orchestrator
-# Loads all language modules and orchestrates dependency updates across the project
+# Dep-Sync - Main Orchestrator
+# Loads all language modules and orchestrates dependency synchronization across the project
 ################################################################################
 
 set -euo pipefail
 
 # Script configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="${SCRIPT_DIR}/dependency-updater.log"
+LOG_FILE="${SCRIPT_DIR}/depsync.log"
 CHANGELOG_FILE="${SCRIPT_DIR}/CHANGELOG.md"
 GIT_BRANCH="dependency-updates-$(date +%s)"
 GIT_COMMIT_MESSAGE="chore: update dependencies"
@@ -302,7 +302,7 @@ create_pull_request() {
 main() {
     echo ""
     log "╔════════════════════════════════════════════════════════════════╗"
-    log "║           Dependency Updater - Main Orchestrator              ║"
+    log "║           Dep-Sync - Main Orchestrator                        ║"
     log "╚════════════════════════════════════════════════════════════════╝"
     echo ""
     

@@ -3,7 +3,7 @@
 # QUICK START GUIDE - Dependency Updater v2.0
 
 echo "╔════════════════════════════════════════════════════════════════╗"
-echo "║        Dependency Updater v2.0 - Quick Start Guide             ║"
+echo "║        Dep-Sync v2.0 - Quick Start Guide                       ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
 echo ""
 echo "📦 NEW FEATURES IMPLEMENTED:"

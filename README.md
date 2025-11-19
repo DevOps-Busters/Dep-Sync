@@ -1,8 +1,8 @@
-# Dependency Updater
+# Dep-Sync
 
-**A comprehensive, automated dependency updater** for 7 programming languages (Node.js, Python, Docker, Java, Go, Rust) with security audits, parallel execution, interactive CLI, monorepo support, and GitHub Actions integration.
+**A comprehensive, automated dependency synchronizer** for 7 programming languages (Node.js, Python, Docker, Java, Go, Rust) with security audits, parallel execution, interactive CLI, monorepo support, and GitHub Actions integration.
 
-**Features:** Multi-language support • Enterprise Nexus Docker registry • Security audits • Parallel execution • Interactive CLI • Monorepo support • Conflict resolution • PR enhancements • Dependency reports • Auto-detection • CI/CD ready
+**Features:** Multi-language support • Enterprise Nexus Docker registry • Security audits • Parallel execution • Interactive CLI • Monorepo support • Conflict resolution • PR enhancements • Dependency reports • Auto-detection • CI/CD ready • Keep dependencies in sync
 
 ---
 

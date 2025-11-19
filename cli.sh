@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Interactive CLI for Dependency Updater
+# Interactive CLI for Dep-Sync
 # Provides menu-driven interface with options for selective updates
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +18,7 @@ source "${SCRIPT_DIR}/dependency-updater-main.sh" 2>/dev/null || {
 show_main_menu() {
     clear
     echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║        Dependency Updater - Interactive CLI (v1.0)             ║"
+    echo "║        Dep-Sync - Interactive CLI (v1.0)                      ║"
     echo "╚════════════════════════════════════════════════════════════════╝"
     echo ""
     echo "Select an option:"

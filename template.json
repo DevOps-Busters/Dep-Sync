@@ -1,7 +1,7 @@
 {
   "owner_name": "DevOps-Busters",
-  "template_name": "Dependency Updater Template",
-  "description": "Automated multi-language dependency updater for GitHub repositories with security audits, parallel execution, and interactive CLI",
+  "template_name": "Dep-Sync Template",
+  "description": "Automated multi-language dependency synchronizer for GitHub repositories with security audits, parallel execution, and interactive CLI",
   "readme": "README.md",
   "documentation": {
     "quickstart": "QUICKSTART.sh",
@@ -18,7 +18,7 @@
     ".gitignore"
   ],
   "customization": {
-    "config_file": "~/.dependency-updater.config",
+    "config_file": "~/.depsync.config",
     "workflow_file": ".github/workflows/auto-update.yaml"
   },
   "features": [
