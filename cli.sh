@@ -45,7 +45,7 @@ run_full_update() {
 }
 
 ################################################################################
-# Option 2: Selective Update
+# Option 2: Selective Update (Bug 3 & Bug 4 fixes)
 ################################################################################
 run_selective_update() {
     clear
@@ -53,7 +53,7 @@ run_selective_update() {
     echo ""
     
     local -A selected=([nodejs]=0 [python]=0 [docker]=0 [java]=0)
-    local names=([nodejs]="Node.js" [python]="Python" [docker]="Docker" [java]="Java")
+    local -A names=([nodejs]="Node.js" [python]="Python" [docker]="Docker" [java]="Java")
     
     for lang in nodejs python docker java; do
         if detect_language "$lang"; then
@@ -80,17 +80,65 @@ run_selective_update() {
     
     echo ""
     log "🚀 Updating selected languages..."
+    log "   Tests: ${RUN_TESTS}, Audit: ${RUN_SECURITY_AUDIT}"
+    echo ""
+    
+    # Initialize changelog for selective update
+    local changelog_file="${SCRIPT_DIR}/CHANGELOG-selective.md"
+    {
+        echo "# Selective Dependency Update - $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+    } > "$changelog_file"
     
     for lang in nodejs python docker java; do
         [[ ${selected[$lang]} -eq 1 ]] && {
             log "📦 ${names[$lang]}..."
-            "${LANG_UPDATERS[$lang]}" "log" "error" || true
-            "${LANG_AUDITORS[$lang]}" "log" || true
+            
+            # Bug 3 & 4 fix: Use case statement like main orchestrator
+            # This ensures tests and changelogs are properly handled
+            case "$lang" in
+                nodejs)
+                    update_nodejs "log" "error" || warning "⚠️ nodejs update failed"
+                    # Bug 3 fix: Respect RUN_TESTS config
+                    [[ "${RUN_TESTS}" == "true" ]] && { test_nodejs "log" || warning "⚠️ nodejs tests failed"; }
+                    [[ "${RUN_SECURITY_AUDIT}" == "true" ]] && { audit_nodejs "log" || warning "⚠️ nodejs audit issues"; }
+                    # Bug 4 fix: Generate changelog
+                    changelog_nodejs >> "$changelog_file" 2>/dev/null || true
+                    ;;
+                python)
+                    update_python "log" "error" || warning "⚠️ python update failed"
+                    [[ "${RUN_TESTS}" == "true" ]] && { test_python "log" || warning "⚠️ python tests failed"; }
+                    [[ "${RUN_SECURITY_AUDIT}" == "true" ]] && { audit_python "log" || warning "⚠️ python audit issues"; }
+                    changelog_python >> "$changelog_file" 2>/dev/null || true
+                    ;;
+                docker)
+                    update_docker "log" "error" || warning "⚠️ docker update failed"
+                    [[ "${RUN_TESTS}" == "true" ]] && { test_docker "log" || warning "⚠️ docker tests failed"; }
+                    [[ "${RUN_SECURITY_AUDIT}" == "true" ]] && { audit_docker "log" || warning "⚠️ docker audit issues"; }
+                    changelog_docker >> "$changelog_file" 2>/dev/null || true
+                    ;;
+                java)
+                    update_java "log" "error" || warning "⚠️ java update failed"
+                    [[ "${RUN_TESTS}" == "true" ]] && { test_java "log" || warning "⚠️ java tests failed"; }
+                    [[ "${RUN_SECURITY_AUDIT}" == "true" ]] && { audit_java "log" || warning "⚠️ java audit issues"; }
+                    changelog_java >> "$changelog_file" 2>/dev/null || true
+                    ;;
+            esac
+            
             success "  ✅ ${names[$lang]} done"
         }
     done
     
+    # Add summary to changelog
+    {
+        echo ""
+        echo "---"
+        echo "**Time:** $(date)"
+    } >> "$changelog_file"
+    
+    echo ""
     success "✅ Complete!"
+    log "📝 Changelog: $changelog_file"
     read -p "Press Enter..."
 }
 
@@ -103,12 +151,14 @@ run_dry_run() {
     echo ""
     
     local found=0
-    local info=([nodejs]="ncu -u && npm install" [python]="pip-compile --upgrade" [docker]="Check base images" [java]="mvn versions:*")
+    local -A info=([nodejs]="ncu -u && npm install" [python]="pip-compile --upgrade" [docker]="Check base images" [java]="mvn versions:*")
     
     for lang in nodejs python docker java; do
         if detect_language "$lang"; then
             echo -e "  ${GREEN}📦 ${lang^}${NC}"
             echo "     Would run: ${info[$lang]}"
+            [[ "${RUN_TESTS}" == "true" ]] && echo "     Would test: yes"
+            [[ "${RUN_SECURITY_AUDIT}" == "true" ]] && echo "     Would audit: yes"
             echo ""
             ((found++))
         fi
@@ -169,7 +219,15 @@ run_audit() {
     for lang in nodejs python docker java; do
         if detect_language "$lang"; then
             echo "🔍 Auditing ${lang}..." | tee -a "$report"
-            "${LANG_AUDITORS[$lang]}" "log" 2>&1 | tee -a "$report" || ((issues++))
+            
+            # Use case statement for consistency
+            case "$lang" in
+                nodejs) audit_nodejs "log" 2>&1 | tee -a "$report" || ((issues++)) ;;
+                python) audit_python "log" 2>&1 | tee -a "$report" || ((issues++)) ;;
+                docker) audit_docker "log" 2>&1 | tee -a "$report" || ((issues++)) ;;
+                java) audit_java "log" 2>&1 | tee -a "$report" || ((issues++)) ;;
+            esac
+            
             echo "" | tee -a "$report"
         fi
     done
