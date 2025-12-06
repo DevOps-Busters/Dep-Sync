@@ -1,312 +1,275 @@
 #!/bin/bash
-
-# Interactive CLI for Dep-Sync
-# Provides menu-driven interface with options for selective updates
+################################################################################
+# Dep-Sync - Interactive CLI
+# Menu-driven interface for dependency management
+################################################################################
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export SCRIPT_DIR
 
-# Source the main orchestrator to get logging functions
-source "${SCRIPT_DIR}/dependency-updater-main.sh" 2>/dev/null || {
-    echo "Error: Cannot find main orchestrator script"
-    exit 1
-}
+source "${SCRIPT_DIR}/lib/common.sh"
 
 ################################################################################
-# Interactive Menu System
+# Menu Display
 ################################################################################
-
-show_main_menu() {
+show_menu() {
     clear
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║        Dep-Sync - Interactive CLI (v1.0)                      ║"
-    echo "╚════════════════════════════════════════════════════════════════╝"
+    echo -e "${CYAN}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║              Dep-Sync - Interactive CLI v2.0                 ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
     echo ""
-    echo "Select an option:"
-    echo ""
-    echo "  1) Run full update (all languages)"
+    echo "  1) Run full update"
     echo "  2) Select languages to update"
-    echo "  3) Run in DRY-RUN mode (preview changes)"
+    echo "  3) Dry-run (preview)"
     echo "  4) View configuration"
-    echo "  5) Update configuration"
-    echo "  6) Security audit only (no updates)"
-    echo "  7) Generate dependency report"
-    echo "  8) Exit"
+    echo "  5) Edit configuration"
+    echo "  6) Security audit only"
+    echo "  7) Generate reports"
+    echo "  8) Check tools"
+    echo "  9) Exit"
     echo ""
 }
 
-show_language_menu() {
+################################################################################
+# Option 1: Full Update
+################################################################################
+run_full_update() {
     clear
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║            Select Languages to Update                          ║"
-    echo "╚════════════════════════════════════════════════════════════════╝"
+    log "🚀 Running full update..."
     echo ""
-    echo "Press space to select/deselect, Enter to confirm:"
+    bash "${SCRIPT_DIR}/dependency-updater-main.sh"
     echo ""
-    
-    # Simple checkbox selection
-    local nodejs_selected=0
-    local python_selected=0
-    local docker_selected=0
-    local java_selected=0
-    local go_selected=0
-    local rust_selected=0
-    
-    echo ""
-    read -p "Update Node.js? (y/n): " -n 1 ans; echo ""
-    [[ "$ans" == "y" ]] && nodejs_selected=1
-    
-    read -p "Update Python? (y/n): " -n 1 ans; echo ""
-    [[ "$ans" == "y" ]] && python_selected=1
-    
-    read -p "Update Docker? (y/n): " -n 1 ans; echo ""
-    [[ "$ans" == "y" ]] && docker_selected=1
-    
-    read -p "Update Java? (y/n): " -n 1 ans; echo ""
-    [[ "$ans" == "y" ]] && java_selected=1
-    
-    read -p "Update Go? (y/n): " -n 1 ans; echo ""
-    [[ "$ans" == "y" ]] && go_selected=1
-    
-    read -p "Update Rust? (y/n): " -n 1 ans; echo ""
-    [[ "$ans" == "y" ]] && rust_selected=1
-    
-    echo ""
-    echo "Selected languages:"
-    [[ $nodejs_selected -eq 1 ]] && echo "  ✅ Node.js"
-    [[ $python_selected -eq 1 ]] && echo "  ✅ Python"
-    [[ $docker_selected -eq 1 ]] && echo "  ✅ Docker"
-    [[ $java_selected -eq 1 ]] && echo "  ✅ Java"
-    [[ $go_selected -eq 1 ]] && echo "  ✅ Go"
-    [[ $rust_selected -eq 1 ]] && echo "  ✅ Rust"
-    
-    echo ""
-    read -p "Proceed? (y/n): " -n 1 ans; echo ""
-    if [[ "$ans" == "y" ]]; then
-        SELECTED_LANGUAGES="nodejs:$nodejs_selected python:$python_selected docker:$docker_selected java:$java_selected go:$go_selected rust:$rust_selected"
-        return 0
-    else
-        return 1
-    fi
+    read -p "Press Enter to continue..."
 }
 
+################################################################################
+# Option 2: Selective Update
+################################################################################
+run_selective_update() {
+    clear
+    echo -e "${CYAN}═══ Select Languages ═══${NC}"
+    echo ""
+    
+    local -A selected=([nodejs]=0 [python]=0 [docker]=0 [java]=0)
+    local names=([nodejs]="Node.js" [python]="Python" [docker]="Docker" [java]="Java")
+    
+    for lang in nodejs python docker java; do
+        if detect_language "$lang"; then
+            echo -e "  ${GREEN}●${NC} ${names[$lang]} detected"
+            read -p "     Update? (y/n): " -n 1 ans; echo ""
+            [[ "$ans" =~ [yY] ]] && selected[$lang]=1
+        else
+            echo -e "  ${YELLOW}○${NC} ${names[$lang]} not found"
+        fi
+    done
+    
+    echo ""
+    echo "Selected:"
+    local any=false
+    for lang in nodejs python docker java; do
+        [[ ${selected[$lang]} -eq 1 ]] && { echo "  ✅ ${names[$lang]}"; any=true; }
+    done
+    
+    [[ "$any" == "false" ]] && { echo "  (none)"; read -p "Press Enter..."; return; }
+    
+    echo ""
+    read -p "Proceed? (y/n): " -n 1 confirm; echo ""
+    [[ ! "$confirm" =~ [yY] ]] && return
+    
+    echo ""
+    log "🚀 Updating selected languages..."
+    
+    for lang in nodejs python docker java; do
+        [[ ${selected[$lang]} -eq 1 ]] && {
+            log "📦 ${names[$lang]}..."
+            "${LANG_UPDATERS[$lang]}" "log" "error" || true
+            "${LANG_AUDITORS[$lang]}" "log" || true
+            success "  ✅ ${names[$lang]} done"
+        }
+    done
+    
+    success "✅ Complete!"
+    read -p "Press Enter..."
+}
+
+################################################################################
+# Option 3: Dry Run
+################################################################################
 run_dry_run() {
     clear
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║                    DRY-RUN MODE (Preview)                      ║"
-    echo "╚════════════════════════════════════════════════════════════════╝"
-    echo ""
-    log "🔍 Scanning project for dependencies..."
+    echo -e "${CYAN}═══ Dry Run Preview ═══${NC}"
     echo ""
     
-    local found_projects=0
+    local found=0
+    local info=([nodejs]="ncu -u && npm install" [python]="pip-compile --upgrade" [docker]="Check base images" [java]="mvn versions:*")
     
-    if detect_nodejs &> /dev/null; then
-        echo "  📦 Node.js project detected"
-        echo "     - Files: $(find . -name 'package.json' -not -path '*/node_modules/*' 2>/dev/null | wc -l)"
-        echo "     - Would run: npm update && npm install"
-        echo "     - Would run: npm test"
-        echo "     - Would run: npm audit"
-        echo ""
-        ((found_projects++))
-    fi
-    
-    if detect_python &> /dev/null; then
-        echo "  📦 Python project detected"
-        if [[ -f "requirements.txt" ]]; then
-            echo "     - Files: requirements.txt"
-            echo "     - Would run: pip-compile --upgrade"
+    for lang in nodejs python docker java; do
+        if detect_language "$lang"; then
+            echo -e "  ${GREEN}📦 ${lang^}${NC}"
+            echo "     Would run: ${info[$lang]}"
+            echo ""
+            ((found++))
         fi
-        if [[ -f "pyproject.toml" ]]; then
-            echo "     - Files: pyproject.toml"
-            echo "     - Would run: poetry update"
-        fi
-        echo "     - Would run: pytest"
-        echo "     - Would run: pip-audit"
-        echo ""
-        ((found_projects++))
-    fi
+    done
     
-    if detect_docker &> /dev/null; then
-        echo "  📦 Docker project detected"
-        echo "     - Files: $(find . -name 'Dockerfile' 2>/dev/null | wc -l)"
-        local image_count=$(grep -c "^FROM" Dockerfile 2>/dev/null || echo 0)
-        echo "     - Base images to check: $image_count"
-        echo "     - Would scan with: trivy"
-        echo ""
-        ((found_projects++))
-    fi
-    
-    if detect_java &> /dev/null; then
-        echo "  📦 Java project detected"
-        if [[ -f "pom.xml" ]]; then
-            echo "     - Files: pom.xml"
-            echo "     - Would run: mvn versions:use-latest-versions"
-        fi
-        if [[ -f "build.gradle" ]] || [[ -f "build.gradle.kts" ]]; then
-            echo "     - Files: build.gradle"
-            echo "     - Would run: ./gradlew dependencyUpdates"
-        fi
-        echo ""
-        ((found_projects++))
-    fi
-    
-    if detect_go &> /dev/null; then
-        echo "  📦 Go project detected"
-        echo "     - Files: go.mod"
-        echo "     - Would run: go get -u ./... && go mod tidy"
-        echo "     - Would run: go test ./..."
-        echo ""
-        ((found_projects++))
-    fi
-    
-    if detect_rust &> /dev/null; then
-        echo "  📦 Rust project detected"
-        echo "     - Files: Cargo.toml"
-        echo "     - Would run: cargo update && cargo test"
-        echo "     - Would run: cargo audit"
-        echo ""
-        ((found_projects++))
-    fi
-    
-    if [[ $found_projects -eq 0 ]]; then
-        warning "⚠️ No supported projects detected"
-    else
-        success "✅ Found $found_projects projects that would be updated"
-        echo ""
-        echo "Git operations that would be performed:"
-        echo "  1. Create branch: dependency-updates-$(date +%s)"
-        echo "  2. Commit changes with message: 'chore: update dependencies'"
-        echo "  3. Create Pull Request (if GitHub Actions configured)"
-    fi
+    [[ $found -eq 0 ]] && warning "⚠️ No projects found"
+    [[ $found -gt 0 ]] && success "✅ ${found} project(s) would be updated"
     
     echo ""
-    read -p "Press Enter to return to main menu..."
+    read -p "Press Enter..."
 }
 
-run_security_audit_only() {
+################################################################################
+# Option 4/5: Configuration
+################################################################################
+view_config() {
     clear
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║               Security Audit (No Updates)                      ║"
-    echo "╚════════════════════════════════════════════════════════════════╝"
+    echo -e "${CYAN}═══ Configuration ═══${NC}"
     echo ""
     
-    # Load modules
-    source "${SCRIPT_DIR}/modules/nodejs.sh" 2>/dev/null
-    source "${SCRIPT_DIR}/modules/python.sh" 2>/dev/null
-    source "${SCRIPT_DIR}/modules/docker.sh" 2>/dev/null
-    source "${SCRIPT_DIR}/modules/java.sh" 2>/dev/null
-    source "${SCRIPT_DIR}/modules/go.sh" 2>/dev/null
-    source "${SCRIPT_DIR}/modules/rust.sh" 2>/dev/null
+    local cfg="${SCRIPT_DIR}/.depsync.config"
+    [[ ! -f "$cfg" ]] && cfg="${HOME}/.depsync.config"
     
-    local audit_report="${SCRIPT_DIR}/security-audit-report.txt"
-    {
-        echo "Security Audit Report - $(date)"
-        echo "====================================="
-        echo ""
-    } > "$audit_report"
-    
-    if detect_nodejs &> /dev/null; then
-        echo "🔍 Auditing Node.js..." | tee -a "$audit_report"
-        audit_nodejs "log" | tee -a "$audit_report"
-        echo "" | tee -a "$audit_report"
+    if [[ -f "$cfg" ]]; then
+        echo "File: $cfg"
+        echo "─────────────────────────"
+        cat "$cfg"
+    else
+        echo "No config file found."
+        echo "Copy: .github/templates/config.example → ~/.depsync.config"
     fi
     
-    if detect_python &> /dev/null; then
-        echo "🔍 Auditing Python..." | tee -a "$audit_report"
-        audit_python "log" | tee -a "$audit_report"
-        echo "" | tee -a "$audit_report"
-    fi
-    
-    if detect_docker &> /dev/null; then
-        echo "🔍 Auditing Docker..." | tee -a "$audit_report"
-        audit_docker "log" | tee -a "$audit_report"
-        echo "" | tee -a "$audit_report"
-    fi
-    
-    if detect_java &> /dev/null; then
-        echo "🔍 Auditing Java..." | tee -a "$audit_report"
-        audit_java "log" | tee -a "$audit_report"
-        echo "" | tee -a "$audit_report"
-    fi
-    
-    if detect_go &> /dev/null; then
-        echo "🔍 Auditing Go..." | tee -a "$audit_report"
-        audit_go "log" | tee -a "$audit_report"
-        echo "" | tee -a "$audit_report"
-    fi
-    
-    if detect_rust &> /dev/null; then
-        echo "🔍 Auditing Rust..." | tee -a "$audit_report"
-        audit_rust "log" | tee -a "$audit_report"
-        echo "" | tee -a "$audit_report"
-    fi
-    
-    success "✅ Security audit complete"
-    log "📋 Report saved to: $audit_report"
     echo ""
-    read -p "Press Enter to return to main menu..."
+    read -p "Press Enter..."
+}
+
+edit_config() {
+    local cfg="${HOME}/.depsync.config"
+    local tpl="${SCRIPT_DIR}/.github/templates/config.example"
+    
+    [[ ! -f "$cfg" && -f "$tpl" ]] && cp "$tpl" "$cfg"
+    ${EDITOR:-nano} "$cfg"
 }
 
 ################################################################################
-# Main Interactive Loop
+# Option 6: Security Audit
 ################################################################################
+run_audit() {
+    clear
+    echo -e "${CYAN}═══ Security Audit ═══${NC}"
+    echo ""
+    
+    local report="${SCRIPT_DIR}/security-audit.txt"
+    echo "Security Audit - $(date)" > "$report"
+    echo "========================" >> "$report"
+    
+    local issues=0
+    for lang in nodejs python docker java; do
+        if detect_language "$lang"; then
+            echo "🔍 Auditing ${lang}..." | tee -a "$report"
+            "${LANG_AUDITORS[$lang]}" "log" 2>&1 | tee -a "$report" || ((issues++))
+            echo "" | tee -a "$report"
+        fi
+    done
+    
+    echo "─────────────────────────"
+    [[ $issues -gt 0 ]] && warning "⚠️ Issues in ${issues} language(s)" || success "✅ No critical issues"
+    log "📋 Report: $report"
+    
+    echo ""
+    read -p "Press Enter..."
+}
 
+################################################################################
+# Option 7: Reports
+################################################################################
+run_reports() {
+    clear
+    echo -e "${CYAN}═══ Generate Reports ═══${NC}"
+    echo ""
+    
+    read -p "Output directory [./reports]: " dir
+    dir="${dir:-./reports}"
+    mkdir -p "$dir"
+    
+    log "📊 Generating reports..."
+    
+    type generate_json_report &>/dev/null && generate_json_report "${dir}/deps.json" "log"
+    type generate_csv_report &>/dev/null && generate_csv_report "${dir}/deps.csv" "log"
+    type generate_markdown_report &>/dev/null && generate_markdown_report "${dir}/deps.md" "log"
+    type generate_sbom_report &>/dev/null && generate_sbom_report "${dir}/sbom.json" "log"
+    
+    echo ""
+    success "✅ Reports generated in: $dir"
+    ls -la "$dir" 2>/dev/null | tail -n +2
+    
+    echo ""
+    read -p "Press Enter..."
+}
+
+################################################################################
+# Option 8: Check Tools
+################################################################################
+check_tools() {
+    clear
+    echo -e "${CYAN}═══ Installed Tools ═══${NC}"
+    echo ""
+    
+    local tools=(
+        "git:git --version"
+        "jq:jq --version"
+        "gh:gh --version"
+        "node:node --version"
+        "npm:npm --version"
+        "ncu:ncu --version"
+        "python3:python3 --version"
+        "pip:pip --version"
+        "pip-audit:pip-audit --version"
+        "docker:docker --version"
+        "java:java -version"
+        "mvn:mvn --version"
+        "trivy:trivy --version"
+    )
+    
+    for item in "${tools[@]}"; do
+        local cmd="${item%%:*}"
+        if command_exists "$cmd"; then
+            echo -e "  ${GREEN}✅${NC} $cmd"
+        else
+            echo -e "  ${YELLOW}○${NC} $cmd (not found)"
+        fi
+    done
+    
+    echo ""
+    read -p "Press Enter..."
+}
+
+################################################################################
+# Main Loop
+################################################################################
 main() {
+    load_config
+    load_all_modules
+    
     while true; do
-        show_main_menu
-        read -p "Enter option (1-8): " option
+        show_menu
+        read -p "Option (1-9): " opt
         
-        case $option in
-            1)
-                log "Running full dependency update..."
-                update_all
-                read -p "Press Enter to continue..."
-                ;;
-            2)
-                if show_language_menu; then
-                    log "Running selective update..."
-                    # TODO: Implement selective updates
-                    log "Feature coming soon!"
-                fi
-                read -p "Press Enter to continue..."
-                ;;
-            3)
-                run_dry_run
-                ;;
-            4)
-                clear
-                echo "Current Configuration:"
-                echo "====================="
-                [[ -f "${SCRIPT_DIR}/.dependency-updater.config" ]] && cat "${SCRIPT_DIR}/.dependency-updater.config" || echo "No config file found"
-                echo ""
-                read -p "Press Enter to continue..."
-                ;;
-            5)
-                log "Opening configuration editor..."
-                ${EDITOR:-nano} "${SCRIPT_DIR}/.dependency-updater.config"
-                ;;
-            6)
-                run_security_audit_only
-                ;;
-            7)
-                log "Generating dependency report..."
-                # TODO: Implement report generation
-                log "Feature coming soon!"
-                read -p "Press Enter to continue..."
-                ;;
-            8)
-                log "Exiting..."
-                exit 0
-                ;;
-            *)
-                error "Invalid option"
-                read -p "Press Enter to continue..."
-                ;;
+        case $opt in
+            1) run_full_update ;;
+            2) run_selective_update ;;
+            3) run_dry_run ;;
+            4) view_config ;;
+            5) edit_config ;;
+            6) run_audit ;;
+            7) run_reports ;;
+            8) check_tools ;;
+            9) echo ""; log "👋 Bye!"; exit 0 ;;
+            *) error "Invalid option"; sleep 1 ;;
         esac
     done
 }
 
-# Run main if not sourced
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main "$@"

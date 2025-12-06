@@ -1,135 +1,115 @@
 #!/bin/bash
+################################################################################
+# Security Audit Module
+# Unified security auditing across all supported languages
+################################################################################
 
-# Shared utilities for all modules
+AUDIT_REPORT="${SCRIPT_DIR:-$(pwd)}/security-audit-report.txt"
 
-# Run security audit for Node.js
-audit_nodejs() {
-    local log_func="$1"
+# Run all security audits
+run_all_audits() {
+    local log_func="${1:-echo}"
     
-    if ! command -v npm &> /dev/null; then
-        return 0
-    fi
+    $log_func "🔒 Running security audit..."
     
-    $log_func "🔒 Running npm security audit..."
+    {
+        echo "Security Audit Report"
+        echo "====================="
+        echo "Generated: $(date)"
+        echo ""
+    } > "$AUDIT_REPORT"
     
-    local audit_output=$(npm audit --json 2>/dev/null || echo "{}")
-    local critical=$(echo "$audit_output" | grep -o '"severity":"critical"' | wc -l)
-    local high=$(echo "$audit_output" | grep -o '"severity":"high"' | wc -l)
+    local issues=0 scanned=0
     
-    if [[ ${critical} -gt 0 ]]; then
-        $log_func "⛔ CRITICAL vulnerabilities found: ${critical}"
-        return 1
-    fi
-    
-    if [[ ${high} -gt 0 ]]; then
-        $log_func "⚠️ HIGH vulnerabilities found: ${high}"
-        return 0
-    fi
-    
-    $log_func "✅ No critical vulnerabilities found"
-    return 0
-}
-
-# Run security audit for Python
-audit_python() {
-    local log_func="$1"
-    
-    if ! command -v pip &> /dev/null; then
-        return 0
-    fi
-    
-    $log_func "🔒 Running pip security audit..."
-    
-    if command -v pip-audit &> /dev/null; then
-        local audit_output=$(pip-audit 2>&1 || true)
-        if echo "$audit_output" | grep -i "critical\|vulnerability" > /dev/null; then
-            $log_func "⚠️ Vulnerabilities detected in Python dependencies"
-            echo "$audit_output" | tee -a "${LOG_FILE:-/dev/null}"
-            return 1
-        fi
-        $log_func "✅ No critical vulnerabilities found"
-    else
-        $log_func "ℹ️ pip-audit not installed. Install with: pip install pip-audit"
-    fi
-    
-    return 0
-}
-
-# Run security audit for Rust
-audit_rust() {
-    local log_func="$1"
-    
-    if ! command -v cargo &> /dev/null; then
-        return 0
-    fi
-    
-    $log_func "🔒 Running cargo security audit..."
-    
-    if cargo audit --json 2>&1 | grep -q "\"vulnerabilities\""; then
-        $log_func "⚠️ Security vulnerabilities detected in Rust dependencies"
-        cargo audit || true
-        return 1
-    fi
-    
-    $log_func "✅ No vulnerabilities found"
-    return 0
-}
-
-# Run security audit for Java
-audit_java() {
-    local log_func="$1"
-    
-    if [[ -f "pom.xml" ]]; then
-        $log_func "🔒 Running Maven dependency check..."
-        if command -v mvn &> /dev/null; then
-            mvn dependency-check:check 2>&1 | tail -20 | tee -a "${LOG_FILE:-/dev/null}" || true
-        fi
-    elif [[ -f "build.gradle" ]] || [[ -f "build.gradle.kts" ]]; then
-        $log_func "🔒 Running Gradle dependency check..."
-        if [[ -x "gradlew" ]]; then
-            ./gradlew dependencyCheckAnalyze 2>&1 | tail -20 | tee -a "${LOG_FILE:-/dev/null}" || true
-        fi
-    fi
-    
-    return 0
-}
-
-# Run security audit for Go
-audit_go() {
-    local log_func="$1"
-    
-    if ! command -v go &> /dev/null; then
-        return 0
-    fi
-    
-    $log_func "🔒 Running Go security check..."
-    
-    if command -v govulncheck &> /dev/null; then
-        govulncheck ./... 2>&1 | tee -a "${LOG_FILE:-/dev/null}" || true
-    else
-        $log_func "ℹ️ govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"
-    fi
-    
-    return 0
-}
-
-# Run security audit for Docker
-audit_docker() {
-    local log_func="$1"
-    
-    $log_func "🔒 Checking Docker image vulnerabilities..."
-    
-    if command -v trivy &> /dev/null; then
-        while IFS= read -r line; do
-            if [[ "$line" =~ ^FROM ]]; then
-                local image=$(echo "$line" | awk '{print $2}')
-                $log_func "  Scanning image: $image"
-                trivy image --severity HIGH,CRITICAL "$image" 2>&1 | tail -10 || true
+    for lang in nodejs python docker java; do
+        if type "detect_${lang}" &>/dev/null && "detect_${lang}" &>/dev/null; then
+            $log_func "🔍 Auditing ${lang}..."
+            echo "## ${lang^}" >> "$AUDIT_REPORT"
+            
+            if type "audit_${lang}" &>/dev/null; then
+                "audit_${lang}" "$log_func" >> "$AUDIT_REPORT" 2>&1 || ((issues++))
             fi
-        done < Dockerfile
-    else
-        $log_func "ℹ️ Trivy not installed. Install from: https://github.com/aquasecurity/trivy"
+            echo "" >> "$AUDIT_REPORT"
+            ((scanned++))
+        fi
+    done
+    
+    echo "Summary: $scanned scanned, $issues with issues" >> "$AUDIT_REPORT"
+    
+    $log_func "✅ Audit complete (${scanned} scanned, ${issues} issues)"
+    $log_func "📋 Report: $AUDIT_REPORT"
+    
+    return $issues
+}
+
+# Check available audit tools
+check_audit_tools() {
+    local log_func="${1:-echo}"
+    local found=0 missing=0
+    
+    $log_func "🔧 Checking audit tools..."
+    
+    local tools=(
+        "npm:npm audit"
+        "pip-audit:pip-audit"
+        "trivy:trivy"
+        "mvn:OWASP dependency-check"
+    )
+    
+    for item in "${tools[@]}"; do
+        local cmd="${item%%:*}"
+        local name="${item#*:}"
+        if command -v "$cmd" &>/dev/null; then
+            $log_func "  ✅ $name"
+            ((found++))
+        else
+            $log_func "  ⚠️ $name (missing)"
+            ((missing++))
+        fi
+    done
+    
+    $log_func "📊 Found: $found, Missing: $missing"
+    return $missing
+}
+
+# Quick security check
+quick_security_check() {
+    local log_func="${1:-echo}"
+    local issues=false
+    
+    $log_func "⚡ Quick security check..."
+    
+    # npm
+    if [[ -f "package.json" ]] && command -v npm &>/dev/null; then
+        if npm audit --audit-level=critical 2>/dev/null | grep -q "critical"; then
+            $log_func "  ⛔ Node.js: CRITICAL vulnerabilities"
+            issues=true
+        else
+            $log_func "  ✅ Node.js: OK"
+        fi
     fi
     
-    return 0
+    # pip
+    if [[ -f "requirements.txt" ]] && command -v pip-audit &>/dev/null; then
+        if pip-audit 2>/dev/null | grep -qi "critical"; then
+            $log_func "  ⛔ Python: CRITICAL vulnerabilities"
+            issues=true
+        else
+            $log_func "  ✅ Python: OK"
+        fi
+    fi
+    
+    [[ "$issues" == "true" ]] && return 1 || return 0
+}
+
+# Generate audit summary for PRs
+generate_audit_summary() {
+    if [[ ! -f "$AUDIT_REPORT" ]]; then
+        echo "No audit report available."
+        return 1
+    fi
+    
+    echo "### 🔒 Security Audit"
+    echo ""
+    grep -E "^##|✅|⚠️|⛔|Summary" "$AUDIT_REPORT" | head -15
 }

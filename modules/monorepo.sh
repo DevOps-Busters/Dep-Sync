@@ -1,53 +1,61 @@
 #!/bin/bash
-
+################################################################################
 # Monorepo & Conflict Resolution Module
+# Handles monorepo structures and dependency conflicts
+################################################################################
 
 # Detect monorepo structure
 detect_monorepo() {
     local log_func="${1:-echo}"
     
-    if [[ -f "lerna.json" ]] || [[ -f "pnpm-workspace.yaml" ]] || [[ -f "package.json" ]]; then
-        if grep -q '"workspaces"' package.json 2>/dev/null; then
-            $log_func "📦 Monorepo detected (npm workspaces)"
-            return 0
-        fi
-    fi
-    
-    if [[ -f "go.work" ]]; then
-        $log_func "📦 Monorepo detected (Go workspaces)"
+    # npm/pnpm workspaces
+    if [[ -f "package.json" ]] && grep -q '"workspaces"' package.json 2>/dev/null; then
+        $log_func "📦 Monorepo: npm workspaces"
         return 0
     fi
     
-    if [[ -d "packages" ]] && [[ -f "package.json" ]]; then
-        $log_func "📦 Monorepo structure detected (packages directory)"
+    # Lerna
+    if [[ -f "lerna.json" ]]; then
+        $log_func "📦 Monorepo: Lerna"
+        return 0
+    fi
+    
+    # pnpm workspaces
+    if [[ -f "pnpm-workspace.yaml" ]]; then
+        $log_func "📦 Monorepo: pnpm"
+        return 0
+    fi
+    
+    # Packages directory pattern
+    if [[ -d "packages" && -f "package.json" ]]; then
+        $log_func "📦 Monorepo: packages/"
         return 0
     fi
     
     return 1
 }
 
+# List monorepo packages
 list_monorepo_packages() {
-    local log_func="${1:-echo}"
-    
     local packages=()
     
-    # NPM workspaces
-    if grep -q '"workspaces"' package.json 2>/dev/null; then
-        while IFS= read -r pkg; do
-            [[ ! -z "$pkg" ]] && packages+=("$pkg")
+    # npm workspaces
+    if command -v jq &>/dev/null && grep -q '"workspaces"' package.json 2>/dev/null; then
+        while read -r pkg; do
+            [[ -n "$pkg" ]] && packages+=("$pkg")
         done < <(jq -r '.workspaces[]?' package.json 2>/dev/null)
     fi
     
     # Lerna
-    if [[ -f "lerna.json" ]]; then
-        while IFS= read -r pkg; do
-            [[ ! -z "$pkg" ]] && packages+=("$pkg")
+    if [[ -f "lerna.json" ]] && command -v jq &>/dev/null; then
+        while read -r pkg; do
+            [[ -n "$pkg" ]] && packages+=("$pkg")
         done < <(jq -r '.packages[]?' lerna.json 2>/dev/null)
     fi
     
-    # Find packages directory
+    # packages/ directory
     if [[ -d "packages" ]]; then
-        while IFS= read -r dir; do
+        while read -r dir; do
             packages+=("${dir#./}")
         done < <(find packages -maxdepth 2 -name "package.json" -exec dirname {} \; 2>/dev/null)
     fi
@@ -55,42 +63,35 @@ list_monorepo_packages() {
     printf '%s\n' "${packages[@]}" | sort -u
 }
 
+# Update single package
 update_monorepo_package() {
-    local package_path="$1"
+    local pkg="$1"
     local log_func="${2:-echo}"
     
-    if [[ ! -d "$package_path" ]]; then
-        $log_func "❌ Package not found: $package_path"
-        return 1
-    fi
+    [[ ! -d "$pkg" ]] && { $log_func "❌ Not found: $pkg"; return 1; }
     
-    $log_func "📦 Updating package: $package_path"
+    $log_func "📦 Updating: $pkg"
     
     (
-        cd "$package_path"
-        
-        if [[ -f "package.json" ]]; then
-            ncu -u || $log_func "⚠️ npm-check-updates had issues"
-            npm install || $log_func "⚠️ npm install had issues"
-        elif [[ -f "pyproject.toml" ]]; then
-            poetry update || $log_func "⚠️ poetry update had issues"
-        elif [[ -f "Cargo.toml" ]]; then
-            cargo update || $log_func "⚠️ cargo update had issues"
-        fi
+        cd "$pkg" || exit 1
+        [[ -f "package.json" ]] && {
+            command -v ncu &>/dev/null && ncu -u
+            npm install
+        }
+        [[ -f "pyproject.toml" ]] && command -v poetry &>/dev/null && poetry update
     )
 }
 
+# Update all packages
 update_all_monorepo_packages() {
     local log_func="${1:-echo}"
     
-    $log_func "🔄 Updating all monorepo packages..."
+    $log_func "🔄 Updating monorepo packages..."
     
-    local packages=($(list_monorepo_packages "$log_func"))
+    local packages
+    mapfile -t packages < <(list_monorepo_packages)
     
-    if [[ ${#packages[@]} -eq 0 ]]; then
-        $log_func "⚠️ No packages found in monorepo"
-        return 1
-    fi
+    [[ ${#packages[@]} -eq 0 ]] && { $log_func "⚠️ No packages found"; return 1; }
     
     $log_func "📊 Found ${#packages[@]} packages"
     
@@ -101,166 +102,95 @@ update_all_monorepo_packages() {
     $log_func "✅ Monorepo update complete"
 }
 
+################################################################################
 # Conflict Resolution
+################################################################################
 
 detect_dependency_conflicts() {
     local log_func="${1:-echo}"
+    local conflicts=0
     
-    $log_func "🔍 Scanning for dependency conflicts..."
+    $log_func "🔍 Checking for conflicts..."
     
-    local conflicts_found=0
-    
-    # Check npm conflicts
-    if [[ -f "package.json" ]] && command -v npm &> /dev/null; then
+    # npm
+    if [[ -f "package.json" ]] && command -v npm &>/dev/null; then
         if npm ls --depth=0 2>&1 | grep -q "npm ERR"; then
-            $log_func "⚠️ Dependency conflicts detected in npm"
-            ((conflicts_found++))
+            $log_func "⚠️ npm conflicts detected"
+            ((conflicts++))
         fi
     fi
     
-    # Check pip conflicts
-    if [[ -f "requirements.txt" ]] && command -v pip &> /dev/null; then
+    # pip
+    if [[ -f "requirements.txt" ]] && command -v pip &>/dev/null; then
         if pip check 2>&1 | grep -q "not compatible"; then
-            $log_func "⚠️ Dependency conflicts detected in pip"
-            ((conflicts_found++))
+            $log_func "⚠️ pip conflicts detected"
+            ((conflicts++))
         fi
     fi
     
-    return $conflicts_found
+    return $conflicts
+}
+
+resolve_conflicts_auto() {
+    local log_func="${1:-echo}"
+    
+    $log_func "🔧 Auto-resolving conflicts..."
+    
+    [[ -f "package.json" ]] && command -v npm &>/dev/null && {
+        $log_func "  npm..."
+        npm install --legacy-peer-deps 2>&1 | tail -3
+    }
+    
+    [[ -f "requirements.txt" ]] && command -v pip &>/dev/null && {
+        $log_func "  pip..."
+        pip install --upgrade -r requirements.txt 2>&1 | tail -3
+    }
+    
+    $log_func "✅ Resolution attempted"
 }
 
 suggest_conflict_resolution() {
     local file="$1"
     local log_func="${2:-echo}"
     
-    $log_func ""
-    $log_func "💡 Suggested Resolutions:"
-    $log_func ""
+    $log_func "💡 Suggestions for $file:"
     
-    if [[ "$file" == "package.json" ]]; then
-        $log_func "1. Run: npm install --force"
-        $log_func "2. Review conflicting packages with: npm ls --depth=0"
-        $log_func "3. Update compatible versions in package.json"
-        $log_func "4. Run: npm ci (for clean install)"
-    elif [[ "$file" == "requirements.txt" ]]; then
-        $log_func "1. Run: pip install --upgrade --force-reinstall"
-        $log_func "2. Check conflicts with: pip check"
-        $log_func "3. Review and update incompatible versions"
-        $log_func "4. Consider using: pip-tools for dependency resolution"
-    elif [[ "$file" == "Cargo.toml" ]]; then
-        $log_func "1. Run: cargo update"
-        $log_func "2. Review Cargo.lock conflicts"
-        $log_func "3. Update version constraints in Cargo.toml"
-        $log_func "4. Run: cargo check"
-    fi
-}
-
-resolve_conflicts_automatically() {
-    local log_func="${1:-echo}"
-    
-    $log_func "🔧 Attempting automatic conflict resolution..."
-    
-    if [[ -f "package.json" ]] && command -v npm &> /dev/null; then
-        $log_func "  Resolving npm conflicts..."
-        npm install --legacy-peer-deps 2>&1 | tail -5 | tee -a "${LOG_FILE:-/dev/null}"
-    fi
-    
-    if [[ -f "requirements.txt" ]] && command -v pip &> /dev/null; then
-        $log_func "  Resolving pip conflicts..."
-        pip install --upgrade --force-reinstall 2>&1 | tail -5 | tee -a "${LOG_FILE:-/dev/null}"
-    fi
-    
-    if [[ -f "Cargo.toml" ]] && command -v cargo &> /dev/null; then
-        $log_func "  Resolving Cargo conflicts..."
-        cargo update 2>&1 | tail -5 | tee -a "${LOG_FILE:-/dev/null}"
-    fi
-    
-    $log_func "✅ Conflict resolution attempted"
-}
-
-interactive_conflict_resolution() {
-    local log_func="${1:-echo}"
-    
-    clear
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║             Interactive Conflict Resolution                    ║"
-    echo "╚════════════════════════════════════════════════════════════════╝"
-    echo ""
-    
-    detect_dependency_conflicts "$log_func"
-    
-    if [[ $? -eq 0 ]]; then
-        $log_func "✅ No conflicts detected"
-        return 0
-    fi
-    
-    echo ""
-    echo "Options:"
-    echo "1) Attempt automatic resolution"
-    echo "2) View suggestions"
-    echo "3) Manually resolve"
-    echo "4) Skip conflict resolution"
-    echo ""
-    
-    read -p "Select option (1-4): " -n 1 option; echo ""
-    
-    case $option in
-        1)
-            resolve_conflicts_automatically "$log_func"
+    case "$file" in
+        package.json)
+            $log_func "  1. npm install --force"
+            $log_func "  2. npm ls --depth=0"
+            $log_func "  3. npm ci"
             ;;
-        2)
-            if [[ -f "package.json" ]]; then
-                suggest_conflict_resolution "package.json" "$log_func"
-            fi
-            if [[ -f "requirements.txt" ]]; then
-                suggest_conflict_resolution "requirements.txt" "$log_func"
-            fi
-            if [[ -f "Cargo.toml" ]]; then
-                suggest_conflict_resolution "Cargo.toml" "$log_func"
-            fi
-            ;;
-        3)
-            $log_func "ℹ️ Please manually resolve conflicts in your dependency files"
-            $log_func "   Then re-run the updater"
-            ;;
-        4)
-            $log_func "⏭️ Skipping conflict resolution"
+        requirements.txt)
+            $log_func "  1. pip install --upgrade -r requirements.txt"
+            $log_func "  2. pip check"
+            $log_func "  3. Use pip-tools"
             ;;
     esac
 }
 
 validate_dependency_tree() {
     local log_func="${1:-echo}"
+    local valid=true
     
-    $log_func "🌳 Validating dependency tree..."
+    $log_func "🌳 Validating dependencies..."
     
-    local all_valid=true
-    
-    if [[ -f "package.json" ]]; then
-        if npm ls --depth=0 &> /dev/null; then
-            $log_func "  ✅ npm dependency tree valid"
+    [[ -f "package.json" ]] && {
+        if npm ls --depth=0 &>/dev/null; then
+            $log_func "  ✅ npm OK"
         else
-            $log_func "  ❌ npm dependency tree has issues"
-            all_valid=false
+            $log_func "  ❌ npm has issues"
+            valid=false
         fi
-    fi
+    }
     
-    if [[ -f "requirements.txt" ]]; then
-        if pip check 2>&1 | grep -q "No broken requirements"; then
-            $log_func "  ✅ pip dependency tree valid"
+    [[ -f "requirements.txt" ]] && {
+        if pip check &>/dev/null; then
+            $log_func "  ✅ pip OK"
         else
-            $log_func "  ⚠️ pip has incompatible requirements"
+            $log_func "  ⚠️ pip has warnings"
         fi
-    fi
+    }
     
-    if [[ -f "Cargo.toml" ]]; then
-        if cargo check --message-format=short 2>&1 | grep -q "error" ; then
-            $log_func "  ❌ Cargo dependency tree has errors"
-            all_valid=false
-        else
-            $log_func "  ✅ Cargo dependency tree valid"
-        fi
-    fi
-    
-    [[ "$all_valid" == "true" ]] && return 0 || return 1
+    [[ "$valid" == "true" ]]
 }

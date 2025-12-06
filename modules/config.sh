@@ -1,240 +1,158 @@
 #!/bin/bash
+################################################################################
+# Configuration Module
+# Manages Dep-Sync settings
+################################################################################
 
-# Configuration Management for Dependency Updater
+CONFIG_FILE="${HOME}/.depsync.config"
 
-CONFIG_FILE="${HOME}/.dependency-updater.config"
-CONFIG_TEMPLATE="${SCRIPT_DIR}/.dependency-updater.config.example"
+# Default configuration template
+DEFAULT_CONFIG='# Dep-Sync Configuration
 
-# Default configuration
-DEFAULT_CONFIG="
-# Dependency Updater Configuration
-# Generated on $(date)
-
-# Enable/disable specific languages
+# Languages
 ENABLE_NODEJS=true
 ENABLE_PYTHON=true
 ENABLE_DOCKER=true
-ENABLE_JAVA=true
-ENABLE_GO=true
-ENABLE_RUST=true
+ENABLE_JAVA=false
 
 # Update strategy: patch, minor, major
 UPDATE_STRATEGY=minor
 
-# Run tests after updates
+# Features
 RUN_TESTS=true
-
-# Run security audits
 RUN_SECURITY_AUDIT=true
-
-# Auto-commit changes
 AUTO_COMMIT=true
-
-# Create pull requests automatically
 CREATE_PULL_REQUEST=true
-
-# Parallel execution (faster but uses more resources)
 PARALLEL_EXECUTION=true
-
-# Maximum parallel jobs
 MAX_PARALLEL_JOBS=4
 
-# Git configuration
-GIT_BRANCH_PREFIX=dependency-updates
-GIT_COMMIT_MESSAGE=chore: update dependencies
+# Git
+GIT_BRANCH_PREFIX=deps/update
+GIT_COMMIT_MESSAGE=chore(deps): update dependencies
 
 # Logging
 LOG_LEVEL=info
-LOG_FILE=dependency-updater.log
+LOG_FILE=depsync.log
 
-# Docker Registry (for Docker module)
-DOCKER_REGISTRIES=docker-hub,nexus
-
-# Nexus Configuration (leave empty to disable)
-NEXUS_ENABLED=false
-NEXUS_URL=
-NEXUS_USER=
-NEXUS_PASSWORD=
-
-# Languages to ignore (comma-separated)
-IGNORE_LANGUAGES=
-
-# Monorepo support
-MONOREPO_ENABLED=false
-MONOREPO_PATHS=
-
-# Update notifications (slack, email, webhook)
-NOTIFICATIONS_ENABLED=false
-NOTIFICATION_TYPE=
-NOTIFICATION_WEBHOOK=
-
-# Conflict resolution strategy: manual, auto, ignore
-CONFLICT_RESOLUTION=manual
-
-# Generate reports
+# Reports
 GENERATE_REPORTS=true
 REPORT_FORMATS=json,csv,md,sbom
-
-# Report output directory
 REPORT_OUTPUT_DIR=./reports
-"
 
+# Docker registries
+DOCKER_REGISTRIES=docker-hub
+NEXUS_ENABLED=false
+
+# Monorepo
+MONOREPO_ENABLED=false
+
+# Notifications
+NOTIFICATIONS_ENABLED=false
+
+# Conflict resolution: manual, auto, ignore
+CONFLICT_RESOLUTION=manual
+'
+
+# Load configuration
 load_config() {
     local log_func="${1:-echo}"
     
     if [[ -f "$CONFIG_FILE" ]]; then
-        $log_func "📋 Loading configuration from: $CONFIG_FILE"
-        source "$CONFIG_FILE" || $log_func "⚠️ Failed to load configuration"
+        $log_func "📋 Config: $CONFIG_FILE"
+        source "$CONFIG_FILE" || $log_func "⚠️ Failed to load config"
     else
-        $log_func "ℹ️ No configuration file found. Using defaults."
-        create_config "$log_func"
+        $log_func "ℹ️ Using defaults (no config file)"
     fi
 }
 
+# Create default config
 create_config() {
     local log_func="${1:-echo}"
-    
-    $log_func "📝 Creating default configuration..."
     
     echo "$DEFAULT_CONFIG" > "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"
     
-    $log_func "✅ Configuration created at: $CONFIG_FILE"
-    $log_func "📖 Edit the file to customize settings"
+    $log_func "✅ Created: $CONFIG_FILE"
 }
 
+# Show configuration
 show_config() {
-    if [[ -f "$CONFIG_FILE" ]]; then
-        cat "$CONFIG_FILE"
-    else
-        echo "No configuration file found."
-        echo "Run 'create_config' to create default configuration."
-    fi
+    [[ -f "$CONFIG_FILE" ]] && cat "$CONFIG_FILE" || echo "No config file. Run create_config."
 }
 
+# Validate configuration
 validate_config() {
     local log_func="${1:-echo}"
     
-    $log_func "🔍 Validating configuration..."
+    $log_func "🔍 Validating config..."
     
-    # Check if languages are properly configured
-    if [[ "$ENABLE_NODEJS" != "true" && "$ENABLE_NODEJS" != "false" ]]; then
-        $log_func "⚠️ Invalid ENABLE_NODEJS value: $ENABLE_NODEJS"
-        return 1
-    fi
+    # Check boolean values
+    for var in ENABLE_NODEJS ENABLE_PYTHON ENABLE_DOCKER ENABLE_JAVA; do
+        local val="${!var}"
+        if [[ "$val" != "true" && "$val" != "false" ]]; then
+            $log_func "⚠️ Invalid $var: $val"
+            return 1
+        fi
+    done
     
     # Check update strategy
-    if [[ "$UPDATE_STRATEGY" != "patch" && "$UPDATE_STRATEGY" != "minor" && "$UPDATE_STRATEGY" != "major" ]]; then
+    if [[ ! "$UPDATE_STRATEGY" =~ ^(patch|minor|major)$ ]]; then
         $log_func "⚠️ Invalid UPDATE_STRATEGY: $UPDATE_STRATEGY"
         return 1
     fi
     
-    # Check conflict resolution strategy
-    if [[ "$CONFLICT_RESOLUTION" != "manual" && "$CONFLICT_RESOLUTION" != "auto" && "$CONFLICT_RESOLUTION" != "ignore" ]]; then
-        $log_func "⚠️ Invalid CONFLICT_RESOLUTION: $CONFLICT_RESOLUTION"
-        return 1
-    fi
-    
-    $log_func "✅ Configuration is valid"
+    $log_func "✅ Config valid"
     return 0
 }
 
+# Get enabled languages
 get_enabled_languages() {
-    local languages=()
-    
-    [[ "$ENABLE_NODEJS" == "true" ]] && languages+=("nodejs")
-    [[ "$ENABLE_PYTHON" == "true" ]] && languages+=("python")
-    [[ "$ENABLE_DOCKER" == "true" ]] && languages+=("docker")
-    [[ "$ENABLE_JAVA" == "true" ]] && languages+=("java")
-    [[ "$ENABLE_GO" == "true" ]] && languages+=("go")
-    [[ "$ENABLE_RUST" == "true" ]] && languages+=("rust")
-    
-    printf '%s\n' "${languages[@]}"
+    local langs=()
+    [[ "$ENABLE_NODEJS" == "true" ]] && langs+=("nodejs")
+    [[ "$ENABLE_PYTHON" == "true" ]] && langs+=("python")
+    [[ "$ENABLE_DOCKER" == "true" ]] && langs+=("docker")
+    [[ "$ENABLE_JAVA" == "true" ]] && langs+=("java")
+    printf '%s\n' "${langs[@]}"
 }
 
+# Check if language is enabled
 is_language_enabled() {
     local lang="$1"
-    local enable_var="ENABLE_$(echo $lang | tr '[:lower:]' '[:upper:]')"
-    
-    [[ "${!enable_var}" == "true" ]]
+    local var="ENABLE_$(echo "$lang" | tr '[:lower:]' '[:upper:]')"
+    [[ "${!var}" == "true" ]]
 }
 
-should_ignore_language() {
-    local lang="$1"
-    
-    if [[ -z "$IGNORE_LANGUAGES" ]]; then
-        return 1
-    fi
-    
-    [[ ",$IGNORE_LANGUAGES," == *",$lang,"* ]]
-}
-
+# Update config value
 update_config() {
-    local key="$1"
-    local value="$2"
+    local key="$1" value="$2"
     local log_func="${3:-echo}"
     
-    if [[ -z "$key" || -z "$value" ]]; then
-        $log_func "❌ Usage: update_config KEY VALUE"
-        return 1
-    fi
+    [[ -z "$key" || -z "$value" ]] && { $log_func "❌ Usage: update_config KEY VALUE"; return 1; }
+    [[ ! -f "$CONFIG_FILE" ]] && { $log_func "❌ No config file"; return 1; }
     
-    if [[ ! -f "$CONFIG_FILE" ]]; then
-        $log_func "❌ Configuration file not found"
-        return 1
-    fi
-    
-    # Use sed to update the config
     sed -i.bak "s/^${key}=.*/${key}=${value}/" "$CONFIG_FILE"
+    rm -f "${CONFIG_FILE}.bak"
     
-    $log_func "✅ Updated $key to: $value"
+    $log_func "✅ Updated $key=$value"
 }
 
+# List all settings
 list_config() {
-    echo "📋 Current Configuration Settings:"
+    echo "📋 Configuration"
     echo ""
-    
-    # Languages
-    echo "Language Support:"
-    echo "  Node.js:  $ENABLE_NODEJS"
-    echo "  Python:   $ENABLE_PYTHON"
-    echo "  Docker:   $ENABLE_DOCKER"
-    echo "  Java:     $ENABLE_JAVA"
-    echo "  Go:       $ENABLE_GO"
-    echo "  Rust:     $ENABLE_RUST"
+    echo "Languages:"
+    echo "  Node.js: ${ENABLE_NODEJS:-true}"
+    echo "  Python:  ${ENABLE_PYTHON:-true}"
+    echo "  Docker:  ${ENABLE_DOCKER:-true}"
+    echo "  Java:    ${ENABLE_JAVA:-false}"
     echo ""
-    
-    # Features
     echo "Features:"
-    echo "  Update Strategy:        $UPDATE_STRATEGY"
-    echo "  Run Tests:              $RUN_TESTS"
-    echo "  Security Audit:         $RUN_SECURITY_AUDIT"
-    echo "  Auto Commit:            $AUTO_COMMIT"
-    echo "  Create Pull Request:    $CREATE_PULL_REQUEST"
-    echo "  Parallel Execution:     $PARALLEL_EXECUTION"
+    echo "  Strategy:  ${UPDATE_STRATEGY:-minor}"
+    echo "  Tests:     ${RUN_TESTS:-true}"
+    echo "  Audit:     ${RUN_SECURITY_AUDIT:-true}"
+    echo "  Parallel:  ${PARALLEL_EXECUTION:-true}"
     echo ""
-    
-    # Git
-    echo "Git Configuration:"
-    echo "  Branch Prefix:          $GIT_BRANCH_PREFIX"
-    echo "  Commit Message:         $GIT_COMMIT_MESSAGE"
-    echo ""
-    
-    # Logging
-    echo "Logging:"
-    echo "  Level:                  $LOG_LEVEL"
-    echo "  File:                   $LOG_FILE"
-    echo ""
-    
-    # Docker
-    echo "Docker Configuration:"
-    echo "  Registries:             $DOCKER_REGISTRIES"
-    echo "  Nexus Enabled:          $NEXUS_ENABLED"
-    echo ""
-    
-    # Reports
-    echo "Reporting:"
-    echo "  Generate Reports:       $GENERATE_REPORTS"
-    echo "  Formats:                $REPORT_FORMATS"
-    echo "  Output Directory:       $REPORT_OUTPUT_DIR"
+    echo "Git:"
+    echo "  Prefix:    ${GIT_BRANCH_PREFIX:-deps/update}"
+    echo "  Message:   ${GIT_COMMIT_MESSAGE:-chore(deps): update dependencies}"
 }

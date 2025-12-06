@@ -1,347 +1,241 @@
 #!/bin/bash
-
 ################################################################################
 # Dep-Sync - Main Orchestrator
-# Loads all language modules and orchestrates dependency synchronization across the project
+# Automated dependency updates for Node.js, Python, Docker, and Java
 ################################################################################
 
 set -euo pipefail
 
-# Script configuration
+# Get script directory and load shared library
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="${SCRIPT_DIR}/depsync.log"
-CHANGELOG_FILE="${SCRIPT_DIR}/CHANGELOG.md"
-GIT_BRANCH="dependency-updates-$(date +%s)"
-GIT_COMMIT_MESSAGE="chore: update dependencies"
+export SCRIPT_DIR
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+source "${SCRIPT_DIR}/lib/common.sh"
 
 ################################################################################
-# Logging Functions
+# Project Detection
 ################################################################################
-
-log() {
-    local message="$1"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${BLUE}[${timestamp}]${NC} ${message}" | tee -a "${LOG_FILE}"
-}
-
-error() {
-    local message="$1"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${RED}[${timestamp}] ERROR: ${message}${NC}" | tee -a "${LOG_FILE}" >&2
-}
-
-success() {
-    local message="$1"
-    echo -e "${GREEN}${message}${NC}" | tee -a "${LOG_FILE}"
-}
-
-warning() {
-    local message="$1"
-    echo -e "${YELLOW}${message}${NC}" | tee -a "${LOG_FILE}"
-}
-
-################################################################################
-# Utility Functions
-################################################################################
-
-command_exists() {
-    command -v "$1" &> /dev/null
-}
-
-################################################################################
-# Module Loading
-################################################################################
-
-load_modules() {
-    log "📦 Loading language modules..."
-    
-    local modules=(
-        "nodejs"
-        "python"
-        "docker"
-        "java"
-        "go"
-        "rust"
-    )
-    
-    for module in "${modules[@]}"; do
-        local module_path="${SCRIPT_DIR}/modules/${module}.sh"
-        if [[ -f "${module_path}" ]]; then
-            source "${module_path}"
-            log "  ✅ Loaded ${module} module"
-        else
-            warning "  ⚠️ Module not found: ${module_path}"
-        fi
-    done
-}
-
-################################################################################
-# Detection & Update Orchestration
-################################################################################
-
 detect_projects() {
     log "🔍 Detecting projects..."
     
     local detected=0
+    local langs=(nodejs python docker java)
+    local enable_vars=(ENABLE_NODEJS ENABLE_PYTHON ENABLE_DOCKER ENABLE_JAVA)
+    local names=("Node.js" "Python" "Docker" "Java")
     
-    if detect_nodejs &> /dev/null; then
-        log "  ✅ Node.js project detected"
-        ((detected++))
-    fi
+    for i in "${!langs[@]}"; do
+        local lang="${langs[$i]}"
+        local enabled="${!enable_vars[$i]}"
+        local name="${names[$i]}"
+        
+        if [[ "$enabled" == "true" ]]; then
+            if detect_language "$lang"; then
+                log "  ✅ ${name} project detected"
+                ((detected++))
+            fi
+        else
+            log "  ⏭️  ${name} disabled"
+        fi
+    done
     
-    if detect_python &> /dev/null; then
-        log "  ✅ Python project detected"
-        ((detected++))
-    fi
-    
-    if detect_docker &> /dev/null; then
-        log "  ✅ Docker project detected"
-        ((detected++))
-    fi
-    
-    if detect_java &> /dev/null; then
-        log "  ✅ Java project detected"
-        ((detected++))
-    fi
-    
-    if detect_go &> /dev/null; then
-        log "  ✅ Go project detected"
-        ((detected++))
-    fi
-    
-    if detect_rust &> /dev/null; then
-        log "  ✅ Rust project detected"
-        ((detected++))
-    fi
-    
-    if [[ ${detected} -eq 0 ]]; then
-        warning "⚠️ No supported projects detected"
-        return 1
-    fi
-    
-    log "📊 Total projects detected: ${detected}"
+    [[ $detected -eq 0 ]] && { warning "⚠️ No projects detected"; return 1; }
+    log "📊 Projects found: ${detected}"
     return 0
 }
 
+################################################################################
+# Update Processing
+################################################################################
+process_language() {
+    local lang="$1"
+    local updater="${LANG_UPDATERS[$lang]}"
+    local tester="${LANG_TESTERS[$lang]}"
+    local auditor="${LANG_AUDITORS[$lang]}"
+    local changelog="${LANG_CHANGELOGS[$lang]}"
+    
+    log "📦 Updating ${lang}..."
+    
+    # Update
+    "$updater" "log" "error" || warning "⚠️ ${lang} update failed"
+    
+    # Test (if enabled)
+    [[ "${RUN_TESTS}" == "true" ]] && { "$tester" "log" || warning "⚠️ ${lang} tests failed"; }
+    
+    # Audit (if enabled)
+    [[ "${RUN_SECURITY_AUDIT}" == "true" ]] && { "$auditor" "log" || warning "⚠️ ${lang} audit issues"; }
+    
+    # Changelog
+    "$changelog" >> "${CHANGELOG_FILE}.${lang}" 2>/dev/null || true
+}
+
 update_all() {
-    log "🚀 Starting dependency updates..."
+    log "🚀 Starting updates (parallel=${PARALLEL_EXECUTION}, tests=${RUN_TESTS}, audit=${RUN_SECURITY_AUDIT})"
     
-    # Detect which projects need updating
-    local updates_needed=()
-    [[ $(detect_nodejs &> /dev/null && echo 1 || echo 0) -eq 1 ]] && updates_needed+=("nodejs")
-    [[ $(detect_python &> /dev/null && echo 1 || echo 0) -eq 1 ]] && updates_needed+=("python")
-    [[ $(detect_docker &> /dev/null && echo 1 || echo 0) -eq 1 ]] && updates_needed+=("docker")
-    [[ $(detect_java &> /dev/null && echo 1 || echo 0) -eq 1 ]] && updates_needed+=("java")
-    [[ $(detect_go &> /dev/null && echo 1 || echo 0) -eq 1 ]] && updates_needed+=("go")
-    [[ $(detect_rust &> /dev/null && echo 1 || echo 0) -eq 1 ]] && updates_needed+=("rust")
+    # Find projects to update
+    local updates=()
+    for lang in nodejs python docker java; do
+        is_language_enabled "$lang" && detect_language "$lang" && updates+=("$lang")
+    done
     
-    # Create changelog header
+    [[ ${#updates[@]} -eq 0 ]] && { warning "⚠️ Nothing to update"; return 0; }
+    
+    log "📊 Updating: ${updates[*]}"
+    
+    # Create changelog
     {
         echo "# Dependency Updates - $(date '+%Y-%m-%d %H:%M:%S')"
         echo ""
     } > "${CHANGELOG_FILE}"
     
-    # Array to store background job PIDs
-    declare -a job_pids
-    declare -a job_names
+    local failed=()
     
-    # Process each language in parallel
-    for lang in "${updates_needed[@]}"; do
-        (
-            case "$lang" in
-                "nodejs")
-                    log "📦 [PARALLEL] Updating Node.js dependencies..."
-                    update_nodejs "log" "error" || warning "⚠️ Node.js update failed"
-                    test_nodejs "log" || warning "⚠️ Node.js tests failed"
-                    audit_nodejs "log" || warning "⚠️ Node.js security audit detected issues"
-                    changelog_nodejs >> "${CHANGELOG_FILE}.nodejs"
-                    ;;
-                "python")
-                    log "📦 [PARALLEL] Updating Python dependencies..."
-                    update_python "log" "error" || warning "⚠️ Python update failed"
-                    test_python "log" || warning "⚠️ Python tests failed"
-                    audit_python "log" || warning "⚠️ Python security audit detected issues"
-                    changelog_python >> "${CHANGELOG_FILE}.python"
-                    ;;
-                "docker")
-                    log "📦 [PARALLEL] Updating Docker images..."
-                    update_docker "log" "error" || warning "⚠️ Docker update failed"
-                    test_docker "log" || warning "⚠️ Docker validation failed"
-                    audit_docker "log" || warning "⚠️ Docker image scan found issues"
-                    changelog_docker >> "${CHANGELOG_FILE}.docker"
-                    ;;
-                "java")
-                    log "📦 [PARALLEL] Updating Java dependencies..."
-                    update_java "log" "error" || warning "⚠️ Java update failed"
-                    test_java "log" || warning "⚠️ Java tests failed"
-                    audit_java "log" || warning "⚠️ Java security audit detected issues"
-                    changelog_java >> "${CHANGELOG_FILE}.java"
-                    ;;
-                "go")
-                    log "📦 [PARALLEL] Updating Go dependencies..."
-                    update_go "log" "error" || warning "⚠️ Go update failed"
-                    test_go "log" || warning "⚠️ Go tests failed"
-                    audit_go "log" || warning "⚠️ Go security audit detected issues"
-                    changelog_go >> "${CHANGELOG_FILE}.go"
-                    ;;
-                "rust")
-                    log "📦 [PARALLEL] Updating Rust dependencies..."
-                    update_rust "log" "error" || warning "⚠️ Rust update failed"
-                    test_rust "log" || warning "⚠️ Rust tests failed"
-                    audit_rust "log" || warning "⚠️ Rust security audit detected issues"
-                    changelog_rust >> "${CHANGELOG_FILE}.rust"
-                    ;;
-            esac
-        ) &
+    if [[ "${PARALLEL_EXECUTION}" == "true" ]]; then
+        # Parallel execution
+        local pids=() names=()
         
-        local pid=$!
-        job_pids+=($pid)
-        job_names+=("$lang")
-        log "  Started background job for $lang (PID: $pid)"
-    done
-    
-    # Wait for all background jobs to complete
-    log ""
-    log "⏳ Waiting for all language updates to complete..."
-    local failed_jobs=()
-    
-    for i in "${!job_pids[@]}"; do
-        local pid=${job_pids[$i]}
-        local name=${job_names[$i]}
+        for lang in "${updates[@]}"; do
+            (process_language "$lang") &
+            pids+=($!)
+            names+=("$lang")
+        done
         
-        if wait $pid; then
-            success "  ✅ ${name} completed"
-        else
-            warning "  ⚠️ ${name} completed with exit code $?"
-            failed_jobs+=("$name")
-        fi
-    done
+        log "⏳ Waiting for updates..."
+        for i in "${!pids[@]}"; do
+            if wait "${pids[$i]}"; then
+                success "  ✅ ${names[$i]} done"
+            else
+                warning "  ⚠️ ${names[$i]} failed"
+                failed+=("${names[$i]}")
+            fi
+        done
+    else
+        # Sequential execution
+        for lang in "${updates[@]}"; do
+            if process_language "$lang"; then
+                success "  ✅ ${lang} done"
+            else
+                warning "  ⚠️ ${lang} failed"
+                failed+=("$lang")
+            fi
+        done
+    fi
     
-    # Consolidate changelogs
-    log "📋 Consolidating changelogs..."
-    for lang in "${updates_needed[@]}"; do
-        if [[ -f "${CHANGELOG_FILE}.${lang}" ]]; then
-            echo "" >> "${CHANGELOG_FILE}"
+    # Merge changelogs
+    for lang in "${updates[@]}"; do
+        [[ -f "${CHANGELOG_FILE}.${lang}" ]] && {
             cat "${CHANGELOG_FILE}.${lang}" >> "${CHANGELOG_FILE}"
-            rm "${CHANGELOG_FILE}.${lang}"
-        fi
+            rm -f "${CHANGELOG_FILE}.${lang}"
+        }
     done
     
-    echo "" >> "${CHANGELOG_FILE}"
+    # Add summary
     {
+        echo ""
         echo "---"
-        echo "**Update Report:**"
-        echo "- Total languages processed: ${#updates_needed[@]}"
-        if [[ ${#failed_jobs[@]} -gt 0 ]]; then
-            echo "- Failed updates: ${failed_jobs[*]}"
-        else
-            echo "- All updates completed successfully ✅"
-        fi
-        echo "- Timestamp: $(date)"
+        echo "**Summary:** ${#updates[@]} updated, ${#failed[@]} failed"
+        echo "**Time:** $(date)"
     } >> "${CHANGELOG_FILE}"
     
-    success "✅ All parallel updates completed"
+    # Generate reports
+    [[ "${GENERATE_REPORTS}" == "true" ]] && {
+        mkdir -p "${REPORT_OUTPUT_DIR}"
+        type generate_all_reports &>/dev/null && generate_all_reports "log" "${REPORT_OUTPUT_DIR}"
+    }
+    
+    success "✅ Updates complete"
+}
+
+################################################################################
+# Git Operations
+################################################################################
+create_backup() {
+    command_exists git || return 1
+    local backup="backup/$(git_current_branch)-$(date +%Y%m%d-%H%M%S)"
+    git branch "$backup" 2>/dev/null && log "🔒 Backup: $backup" || true
 }
 
 git_commit_and_push() {
-    log "📝 Preparing git commit..."
+    log "📝 Git operations..."
     
-    if ! command_exists git; then
-        error "Git is not installed"
-        return 1
-    fi
+    command_exists git || { error "Git not installed"; return 1; }
+    [[ "${AUTO_COMMIT}" != "true" ]] && { log "ℹ️ Auto-commit disabled"; return 0; }
     
-    # Check if there are changes
-    if git diff --quiet; then
-        log "ℹ️ No changes detected"
-        return 0
-    fi
+    git_has_changes || { log "ℹ️ No changes"; return 0; }
     
-    # Create branch
-    log "🌿 Creating branch: ${GIT_BRANCH}"
-    git checkout -b "${GIT_BRANCH}" || git checkout "${GIT_BRANCH}"
+    local branch="${GIT_BRANCH_PREFIX}-$(date +%s)"
     
-    # Stage changes
-    log "📦 Staging changes..."
+    log "🌿 Branch: ${branch}"
+    git checkout -b "${branch}" 2>/dev/null || git checkout "${branch}" 2>/dev/null || true
+    
     git add -A
+    git commit -m "${GIT_COMMIT_MESSAGE}" || { warning "⚠️ Nothing to commit"; return 0; }
     
-    # Commit
-    log "💾 Committing changes..."
-    git commit -m "${GIT_COMMIT_MESSAGE}" || warning "⚠️ Nothing to commit"
-    
-    # Push
-    if [[ "${PUSH_TO_REMOTE:-false}" == "true" ]]; then
-        log "🚀 Pushing to remote..."
-        git push -u origin "${GIT_BRANCH}" || warning "⚠️ Push failed"
+    if [[ "${PUSH_TO_REMOTE}" == "true" ]]; then
+        log "🚀 Pushing..."
+        git push -u origin "${branch}" || warning "⚠️ Push failed"
     fi
 }
 
 create_pull_request() {
-    log "🔗 Pull request creation details:"
-    log "  Branch: ${GIT_BRANCH}"
-    log "  Title: ${GIT_COMMIT_MESSAGE}"
-    log "  Changelog: $(head -10 ${CHANGELOG_FILE})"
-    log "ℹ️ Configure GitHub Actions secrets for automated PR creation:"
-    log "  - TOKEN: GitHub Personal Access Token"
-    log "  - NEXUS_URL: Nexus repository URL (for Docker images)"
-    log "  - NEXUS_USER: Nexus username"
-    log "  - NEXUS_PASSWORD: Nexus password"
+    command_exists gh || { warning "⚠️ GitHub CLI not installed"; return 1; }
+    gh auth status &>/dev/null || { warning "⚠️ Not authenticated"; return 1; }
+    
+    local branch="${GIT_BRANCH_PREFIX}-$(date +%s)"
+    local title="${GIT_COMMIT_MESSAGE}"
+    local body="## 📦 Dependency Update
+
+### Changes
+$(cat "${CHANGELOG_FILE}" 2>/dev/null || echo "See commits")
+
+---
+*Generated by Dep-Sync*"
+    
+    log "🔗 Creating PR..."
+    
+    local url
+    url=$(gh pr create --title "$title" --body "$body" --base main --head "$branch" --label "dependencies" 2>&1) && {
+        success "✅ PR created: $url"
+        [[ -n "${DEFAULT_REVIEWERS:-}" ]] && gh pr edit --add-reviewer "${DEFAULT_REVIEWERS}" 2>/dev/null || true
+    } || warning "⚠️ PR creation failed"
 }
 
 ################################################################################
 # Main
 ################################################################################
-
 main() {
     echo ""
-    log "╔════════════════════════════════════════════════════════════════╗"
-    log "║           Dep-Sync - Main Orchestrator                        ║"
-    log "╚════════════════════════════════════════════════════════════════╝"
+    log "╔══════════════════════════════════════════════════════════════╗"
+    log "║                    Dep-Sync v2.0                             ║"
+    log "╚══════════════════════════════════════════════════════════════╝"
     echo ""
     
-    # Load all language modules
-    load_modules || {
-        error "Failed to load modules"
-        return 1
-    }
-    
+    # Initialize
+    load_config
+    load_all_modules
     echo ""
     
-    # Detect projects
-    detect_projects || {
-        error "No supported projects found"
-        return 1
-    }
-    
+    # Detect
+    detect_projects || { error "No projects found"; return 1; }
     echo ""
     
-    # Update all dependencies
-    update_all || {
-        error "Dependency update failed"
-        return 1
-    }
+    # Backup
+    [[ "${CREATE_BACKUP_BRANCH}" == "true" ]] && create_backup
     
+    # Update
+    update_all || { error "Update failed"; return 1; }
     echo ""
     
-    # Git operations
+    # Git
     git_commit_and_push
-    create_pull_request
+    [[ "${CREATE_PULL_REQUEST}" == "true" && "${PUSH_TO_REMOTE}" == "true" ]] && create_pull_request
     
     echo ""
-    success "╔════════════════════════════════════════════════════════════════╗"
-    success "║                   ✅ All tasks completed!                      ║"
-    success "╚════════════════════════════════════════════════════════════════╝"
+    success "╔══════════════════════════════════════════════════════════════╗"
+    success "║                    ✅ Complete!                              ║"
+    success "╚══════════════════════════════════════════════════════════════╝"
     echo ""
-    log "📋 Logs saved to: ${LOG_FILE}"
-    log "📝 Changelog saved to: ${CHANGELOG_FILE}"
+    log "📋 Log: ${LOG_FILE}"
+    log "📝 Changelog: ${CHANGELOG_FILE}"
 }
 
-# Run main function
 main "$@"

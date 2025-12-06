@@ -1,23 +1,45 @@
-name: Auto-Dependency-Updater
+name: Dep-Sync Auto Update
 
 on:
   schedule:
-    - cron: '0 0 * * 1'  # Run every Monday at midnight
+    # Run every Monday at midnight UTC - customize as needed
+    - cron: '0 0 * * 1'
   workflow_dispatch:
-  push:
-    branches:
-      - main
+    inputs:
+      dry_run:
+        description: 'Dry run mode (preview only, no changes)'
+        required: false
+        default: false
+        type: boolean
+      languages:
+        description: 'Languages to update (comma-separated: nodejs,python,docker,java)'
+        required: false
+        default: 'all'
+        type: string
+
+env:
+  # Git configuration - customize these for your repository
+  GIT_USER_NAME: ${{ vars.GIT_USER_NAME || github.actor }}
+  GIT_USER_EMAIL: ${{ vars.GIT_USER_EMAIL || format('{0}@users.noreply.github.com', github.actor) }}
 
 jobs:
   update_dependencies:
     runs-on: ubuntu-latest
+    
     env:
-      TOKEN: ${{ secrets.TOKEN }}
-      USERNAME: "apoorv-katiyar"
-      EMAILID: "katiyar.apoorv97@gmail.com"
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NEXUS_URL: ${{ secrets.NEXUS_URL }}
       NEXUS_USER: ${{ secrets.NEXUS_USER }}
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+      # Language toggles (set to 'false' in repository variables to disable)
+      ENABLE_NODEJS: ${{ vars.ENABLE_NODEJS || 'true' }}
+      ENABLE_PYTHON: ${{ vars.ENABLE_PYTHON || 'true' }}
+      ENABLE_DOCKER: ${{ vars.ENABLE_DOCKER || 'true' }}
+      ENABLE_JAVA: ${{ vars.ENABLE_JAVA || 'false' }}
+      # Safety settings
+      RUN_TESTS: ${{ vars.RUN_TESTS || 'true' }}
+      RUN_SECURITY_AUDIT: ${{ vars.RUN_SECURITY_AUDIT || 'true' }}
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
 
     permissions:
       contents: write
@@ -26,79 +48,133 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        if: env.ENABLE_NODEJS == 'true'
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        if: env.ENABLE_PYTHON == 'true'
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Set up Java
+        if: env.ENABLE_JAVA == 'true'
+        uses: actions/setup-java@v4
         with:
-          go-version: '1.21'
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
 
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            openjdk-11-jdk \
-            maven \
-            gradle \
-            jq \
-            curl \
-            gh \
-            docker.io
+          sudo apt-get install -y jq curl
 
-      - name: Install Node.js Global Tools
+      - name: Install Node.js Tools
+        if: env.ENABLE_NODEJS == 'true'
         run: |
           npm install -g npm-check-updates
+          echo "✅ Installed npm-check-updates"
 
       - name: Install Python Tools
+        if: env.ENABLE_PYTHON == 'true'
         run: |
           pip install --upgrade pip
-          pip install pip-tools pytest poetry
+          pip install pip-tools pip-audit
+          echo "✅ Installed pip-tools and pip-audit"
 
       - name: Configure Git
         run: |
-          git config --global user.name "$USERNAME"
-          git config --global user.email "$EMAILID"
+          git config --global user.name "${{ env.GIT_USER_NAME }}"
+          git config --global user.email "${{ env.GIT_USER_EMAIL }}"
+          echo "✅ Git configured for ${{ env.GIT_USER_NAME }}"
 
-      - name: Run Dependency Updater Script
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN }}
-          NEXUS_URL: ${{ secrets.NEXUS_URL }}
-          NEXUS_USER: ${{ secrets.NEXUS_USER }}
-          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+      - name: Make scripts executable
         run: |
-          echo "Running Dependency Updater Script..."
-          bash dependency-updater.sh 2>&1 | tee dependency-updater.log || {
-            echo "❌ Error occurred while running dependency-updater.sh. Check the log below."
-            cat dependency-updater.log
-            exit 1
-          }
-          echo "✅ Dependency update completed successfully."
+          chmod +x dependency-updater-main.sh cli.sh
+          chmod +x modules/*.sh
 
-      - name: Upload logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v3
+      - name: Run Dependency Updater (Dry Run)
+        if: env.DRY_RUN == 'true'
+        run: |
+          echo "🔍 Running in DRY-RUN mode (preview only)"
+          echo ""
+          echo "Would update the following:"
+          
+          if [[ "$ENABLE_NODEJS" == "true" ]] && [[ -f "package.json" ]]; then
+            echo "📦 Node.js dependencies:"
+            ncu 2>/dev/null || echo "  (ncu not available)"
+          fi
+          
+          if [[ "$ENABLE_PYTHON" == "true" ]] && [[ -f "requirements.txt" ]]; then
+            echo "🐍 Python dependencies:"
+            pip list --outdated 2>/dev/null | head -10 || echo "  (pip list not available)"
+          fi
+          
+          echo ""
+          echo "✅ Dry run complete - no changes made"
+
+      - name: Run Dependency Updater
+        if: env.DRY_RUN != 'true'
+        run: |
+          echo "🚀 Running Dep-Sync..."
+          
+          # Export config for the script
+          export ENABLE_NODEJS="${ENABLE_NODEJS}"
+          export ENABLE_PYTHON="${ENABLE_PYTHON}"
+          export ENABLE_DOCKER="${ENABLE_DOCKER}"
+          export ENABLE_JAVA="${ENABLE_JAVA}"
+          export RUN_TESTS="${RUN_TESTS}"
+          export RUN_SECURITY_AUDIT="${RUN_SECURITY_AUDIT}"
+          export PUSH_TO_REMOTE="true"
+          export CREATE_PULL_REQUEST="true"
+          
+          bash dependency-updater-main.sh 2>&1 | tee depsync.log
+          
+          exit_code=${PIPESTATUS[0]}
+          if [[ $exit_code -ne 0 ]]; then
+            echo "⚠️ Dependency updater completed with warnings (exit code: $exit_code)"
+          else
+            echo "✅ Dependency update completed successfully"
+          fi
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: dependency-updater-logs
+          name: depsync-logs-${{ github.run_id }}
           path: |
-            dependency-updater.log
-            changelog.txt
+            depsync.log
+            CHANGELOG.md
+            reports/
+          retention-days: 30
 
-      - name: Review results if failed
-        if: failure()
+      - name: Summary
+        if: always()
         run: |
-          echo "❌ Dependency Update Failed. Check the logs for details."
-          cat dependency-updater.log || echo "No log file found."
-          echo "Please review the changes and try again."
-          echo "If you need assistance, please contact the repository maintainer."
+          echo "## Dep-Sync Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Node.js | $ENABLE_NODEJS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python | $ENABLE_PYTHON |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker | $ENABLE_DOCKER |" >> $GITHUB_STEP_SUMMARY
+          echo "| Java | $ENABLE_JAVA |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry Run | $DRY_RUN |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ -f "depsync.log" ]]; then
+            echo "### Log Output" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -50 depsync.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi

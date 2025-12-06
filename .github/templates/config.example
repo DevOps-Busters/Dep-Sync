@@ -1,186 +1,84 @@
-# Dependency Updater - Configuration Template
-# Copy this file to ~/.dependency-updater.config and customize for your project
-# Generated on: November 17, 2025
+# Dep-Sync Configuration
+# Copy to ~/.depsync.config or project root as .depsync.config
 
 # ============================================================================
-# LANGUAGE SUPPORT - Enable/disable specific languages
+# LANGUAGE SUPPORT
 # ============================================================================
+ENABLE_NODEJS=true      # Node.js / npm projects
+ENABLE_PYTHON=true      # Python / pip / Poetry projects
+ENABLE_DOCKER=true      # Dockerfile base image updates
+ENABLE_JAVA=false       # Maven / Gradle projects
 
-ENABLE_NODEJS=true
-ENABLE_PYTHON=true
-ENABLE_DOCKER=true
-ENABLE_JAVA=false
-ENABLE_GO=false
-ENABLE_RUST=false
+# ============================================================================
+# SAFETY SETTINGS
+# ============================================================================
+RUN_TESTS=true              # Run tests after updates
+RUN_SECURITY_AUDIT=true     # Run security audits
+CREATE_BACKUP_BRANCH=true   # Backup before changes
+FAIL_ON_VULNERABILITY=false # Fail on critical vulns
 
 # ============================================================================
 # UPDATE STRATEGY
 # ============================================================================
-
-# Options: patch (x.y.Z), minor (x.Y.z), major (X.y.z)
+# Options: patch (safest), minor (recommended), major (breaking possible)
 UPDATE_STRATEGY=minor
-
-# ============================================================================
-# FEATURES
-# ============================================================================
-
-# Run tests after updates
-RUN_TESTS=true
-
-# Run security audits (npm audit, pip-audit, cargo audit, etc.)
-RUN_SECURITY_AUDIT=true
-
-# Auto-commit changes after update
-AUTO_COMMIT=true
-
-# Create pull requests automatically
-CREATE_PULL_REQUEST=true
-
-# ============================================================================
-# PERFORMANCE
-# ============================================================================
-
-# Run language updates in parallel (faster, uses more resources)
-PARALLEL_EXECUTION=true
-
-# Maximum number of parallel jobs
-MAX_PARALLEL_JOBS=4
 
 # ============================================================================
 # GIT CONFIGURATION
 # ============================================================================
+AUTO_COMMIT=true
+PUSH_TO_REMOTE=true
+CREATE_PULL_REQUEST=true
+GIT_BRANCH_PREFIX=deps/update
+GIT_COMMIT_MESSAGE="chore(deps): update dependencies"
 
-# Prefix for git branch names (full name: ${prefix}-${timestamp})
-GIT_BRANCH_PREFIX=dependency-updates
-
-# Commit message template
-GIT_COMMIT_MESSAGE=chore: update dependencies
-
-# ============================================================================
-# LOGGING & OUTPUT
-# ============================================================================
-
-# Log level: debug, info, warn, error
-LOG_LEVEL=info
-
-# Log file location (relative or absolute path)
-LOG_FILE=dependency-updater.log
+# PR reviewers (comma-separated GitHub usernames)
+DEFAULT_REVIEWERS=
 
 # ============================================================================
-# DOCKER REGISTRY CONFIGURATION
+# PERFORMANCE
 # ============================================================================
+PARALLEL_EXECUTION=true
+MAX_PARALLEL_JOBS=4
 
-# Docker registries to check: docker-hub, nexus, artifactory
+# ============================================================================
+# DOCKER REGISTRY
+# ============================================================================
 DOCKER_REGISTRIES=docker-hub
-
-# ============================================================================
-# ENTERPRISE NEXUS SUPPORT (Optional)
-# ============================================================================
-
-# Enable Nexus Docker registry support
 NEXUS_ENABLED=false
-
-# Nexus server URL (e.g., https://nexus.company.com)
 NEXUS_URL=
-
-# Nexus username (for authentication)
 NEXUS_USER=
-
-# Nexus password or API token (for authentication)
 NEXUS_PASSWORD=
-
-# ============================================================================
-# MONOREPO CONFIGURATION
-# ============================================================================
-
-# Enable monorepo support (npm workspaces, Lerna, Go workspaces, etc.)
-MONOREPO_ENABLED=false
-
-# Specific monorepo paths to update (comma-separated)
-# Example: MONOREPO_PATHS=packages/app,packages/core,services/*
-MONOREPO_PATHS=
-
-# ============================================================================
-# DEPENDENCY CONFLICTS
-# ============================================================================
-
-# Conflict resolution strategy: manual, auto, ignore
-# - manual: User must resolve conflicts
-# - auto: Automatically attempt resolution
-# - ignore: Skip conflict resolution
-CONFLICT_RESOLUTION=manual
 
 # ============================================================================
 # REPORTING
 # ============================================================================
-
-# Generate dependency reports (JSON, CSV, SBOM, Markdown)
 GENERATE_REPORTS=true
-
-# Report formats: json, csv, sbom, md (comma-separated)
-REPORT_FORMATS=json,csv,md,sbom
-
-# Directory where reports are saved
+REPORT_FORMATS=json,md
 REPORT_OUTPUT_DIR=./reports
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+LOG_LEVEL=info
+LOG_FILE=depsync.log
+
+# ============================================================================
+# MONOREPO (Optional)
+# ============================================================================
+MONOREPO_ENABLED=false
+MONOREPO_PATHS=
 
 # ============================================================================
 # NOTIFICATIONS (Optional)
 # ============================================================================
-
-# Enable notifications (slack, email, webhook)
 NOTIFICATIONS_ENABLED=false
-
-# Notification type: slack, email, webhook
 NOTIFICATION_TYPE=
-
-# Webhook URL for notifications
 NOTIFICATION_WEBHOOK=
 
 # ============================================================================
-# IGNORING SPECIFIC LANGUAGES
+# ADVANCED
 # ============================================================================
-
-# Languages to ignore (comma-separated)
-# Example: IGNORE_LANGUAGES=java,go
-IGNORE_LANGUAGES=
-
-# ============================================================================
-# SECURITY AUDIT TOOLS
-# ============================================================================
-
-# Tools for security scanning (auto-detected if installed)
-# npm audit - Built into npm
-# pip-audit - Install: pip install pip-audit
-# cargo audit - Install: cargo install cargo-audit
-# govulncheck - Install: go install golang.org/x/vuln/cmd/govulncheck@latest
-# trivy - Download: https://github.com/aquasecurity/trivy
-
-ENABLE_TRIVY=false
-ENABLE_GOVULNCHECK=false
-ENABLE_PIP_AUDIT=false
-ENABLE_CARGO_AUDIT=false
-
-# ============================================================================
-# TEAM CONFIGURATION
-# ============================================================================
-
-# Your team name (for reports and PR descriptions)
-TEAM_NAME=
-
-# Default reviewers for PRs (comma-separated GitHub usernames)
-DEFAULT_REVIEWERS=
-
-# ============================================================================
-# ADVANCED OPTIONS
-# ============================================================================
-
-# Skip certain dependency patterns (regex)
-# Example: SKIP_DEPENDENCIES=@types/*,test-*
 SKIP_DEPENDENCIES=
-
-# Include only specific dependency patterns (regex)
-# Example: INCLUDE_DEPENDENCIES=@company/*
 INCLUDE_DEPENDENCIES=
-
-# Maximum days since last update (only update if last > N days)
-DAYS_SINCE_LAST_UPDATE=0
+CONFLICT_RESOLUTION=manual
