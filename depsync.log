@@ -1,0 +1,79 @@
+[2026-02-06T06:38:27.552Z] ⚠️  .env not found. Initializing with defaults...
+[2026-02-06T06:38:27.554Z] 
+════ 🔍 Detecting project languages ════
+[2026-02-06T06:38:27.555Z] 
+════ 🔍 Detecting project languages... ════
+[2026-02-06T06:38:27.697Z] ✅ ✓ Detected nodejs
+[2026-02-06T06:38:36.660Z] ⚠️  .env not found. Initializing with defaults...
+[2026-02-06T06:38:36.661Z] 
+════ 📊 Dep-Sync Status ════
+[2026-02-06T06:38:36.662Z] 
+════ ⚙️  Configuration ════
+[2026-02-06T06:38:36.663Z] 
+════ Configuration ════
+[2026-02-06T06:38:36.714Z]   Languages: nodejs, python, docker
+[2026-02-06T06:38:36.714Z]   Strategy: minor
+[2026-02-06T06:38:36.715Z]   Run Tests: true
+[2026-02-06T06:38:36.716Z]   Run Audit: true
+[2026-02-06T06:38:36.716Z]   Parallel: true
+[2026-02-06T06:38:36.717Z]   Log File: ./depsync.log
+[2026-02-06T06:38:36.718Z] 
+════ 📋 Dependency Manager Status ════
+[2026-02-06T06:38:36.719Z] 
+════ 📊 Language Registry Status ════
+[2026-02-06T06:38:36.720Z] ℹ️  ✓ nodejs (enabled)
+[2026-02-06T06:38:36.721Z] ℹ️  ✓ python (enabled)
+[2026-02-06T06:38:36.721Z] ℹ️  ✓ docker (enabled)
+[2026-02-06T06:38:36.722Z] ℹ️  ○ java (disabled)
+[2026-02-06T06:38:36.723Z] ℹ️  
+[2026-02-06T06:38:36.724Z] 
+════ 🛠️  Tool Status ════
+[2026-02-06T06:38:36.839Z] ℹ️  ✓ git v2.53.0 (required)
+[2026-02-06T06:38:36.938Z] ℹ️  ✓ node v18.20.4 (required)
+[2026-02-06T06:38:37.303Z] ℹ️  ✓ npm v10.7.0 (optional)
+[2026-02-06T06:38:37.405Z] ℹ️  ✓ python v3.13.2 (optional)
+[2026-02-06T06:38:38.808Z] ℹ️  ✓ pip v24.3.1 (optional)
+[2026-02-06T06:38:38.864Z] ℹ️  ○ poetry (optional)
+[2026-02-06T06:38:39.024Z] ℹ️  ✓ docker v29.1.3 (optional)
+[2026-02-06T06:38:39.080Z] ℹ️  ○ java (optional)
+[2026-02-06T06:38:39.139Z] ℹ️  ○ maven (optional)
+[2026-02-06T06:38:39.211Z] ℹ️  ○ gradle (optional)
+[2026-02-06T06:38:39.476Z] ℹ️  ✓ gh v2.65.0 (optional)
+[2026-02-06T06:38:39.567Z] ℹ️  ✓ curl v8.16.0 (optional)
+[2026-02-06T06:38:39.582Z] ℹ️  
+[2026-02-06T06:38:39.597Z] 
+════ 📊 Git Status ════
+[2026-02-06T06:38:39.810Z] ℹ️  Current Branch: prerelease
+[2026-02-06T06:38:39.870Z] ℹ️  Origin: https://github.com/apoorv-katiyar/Dep-Sync.git
+[2026-02-06T06:38:39.926Z] ⚠️  Uncommitted Changes: 24
+[2026-02-06T06:40:49.258Z] ⚠️  .env not found. Initializing with defaults...
+[2026-02-06T06:40:49.261Z] 
+════ 🚀 Starting Dependency Update ════
+[2026-02-06T06:40:49.261Z] 
+════ ✅ Pre-flight checks ════
+[2026-02-06T06:40:49.262Z] 
+════ 🚀 Pre-flight checks... ════
+[2026-02-06T06:40:49.263Z] 
+════ ✅ Validating core tools... ════
+[2026-02-06T06:40:49.369Z] ✅ ✓ git (2.53.0)
+[2026-02-06T06:40:49.472Z] ✅ ✓ node (18.20.4)
+[2026-02-06T06:40:49.472Z] 
+════ 📦 Checking language tools... ════
+[2026-02-06T06:40:49.531Z] ✅ ✓ Node.js/npm available
+[2026-02-06T06:40:49.636Z] ✅ ✓ Python/pip available
+[2026-02-06T06:40:49.691Z] ✅ ✓ Docker available
+[2026-02-06T06:40:49.849Z] ℹ️  ○ Java tools not available
+[2026-02-06T06:40:49.850Z] ✅ ✓ All checks passed
+[2026-02-06T06:40:49.876Z] 
+════ 📊 Git Status ════
+[2026-02-06T06:40:49.924Z] ℹ️  Current Branch: prerelease
+[2026-02-06T06:40:49.974Z] ℹ️  Origin: https://github.com/apoorv-katiyar/Dep-Sync.git
+[2026-02-06T06:40:50.027Z] ⚠️  Uncommitted Changes: 25
+[2026-02-06T06:40:50.069Z] ⚠️  ⚠️  Working directory has uncommitted changes
+[2026-02-06T06:40:50.070Z] 
+════ 🔍 Detecting project languages... ════
+[2026-02-06T06:40:50.187Z] ✅ ✓ Detected nodejs
+[2026-02-06T06:40:50.751Z] 
+════ 📦 Updating dependencies... ════
+[2026-02-06T06:40:50.821Z] 🔄 Updating Node.js dependencies...
+[2026-02-06T06:40:52.361Z]    Strategy: patch

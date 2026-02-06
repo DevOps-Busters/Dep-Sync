@@ -56,15 +56,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
+
+      - name: Cache npm dependencies
+        if: env.ENABLE_NODEJS == 'true' && hashFiles('**/package-lock.json') != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Set up Python
         if: env.ENABLE_PYTHON == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+
+      - name: Cache pip dependencies
+        if: env.ENABLE_PYTHON == 'true' && hashFiles('**/requirements*.txt', '**/pyproject.toml') != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Set up Java
         if: env.ENABLE_JAVA == 'true'
@@ -72,7 +87,15 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'maven'
+
+      - name: Cache Maven dependencies
+        if: env.ENABLE_JAVA == 'true' && hashFiles('**/pom.xml') != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
 
       - name: Install System Dependencies
         run: |
@@ -103,38 +126,18 @@ jobs:
           chmod +x dependency-updater-main.sh cli.sh
           chmod +x modules/*.sh
 
-      - name: Run Dependency Updater (Dry Run)
-        if: env.DRY_RUN == 'true'
-        run: |
-          echo "🔍 Running in DRY-RUN mode (preview only)"
-          echo ""
-          echo "Would update the following:"
-          
-          if [[ "$ENABLE_NODEJS" == "true" ]] && [[ -f "package.json" ]]; then
-            echo "📦 Node.js dependencies:"
-            ncu 2>/dev/null || echo "  (ncu not available)"
-          fi
-          
-          if [[ "$ENABLE_PYTHON" == "true" ]] && [[ -f "requirements.txt" ]]; then
-            echo "🐍 Python dependencies:"
-            pip list --outdated 2>/dev/null | head -10 || echo "  (pip list not available)"
-          fi
-          
-          echo ""
-          echo "✅ Dry run complete - no changes made"
-
       - name: Run Dependency Updater
-        if: env.DRY_RUN != 'true'
         run: |
           echo "🚀 Running Dep-Sync..."
+          [[ "$DRY_RUN" == "true" ]] && echo "🔍 DRY RUN mode (preview only)"
           
-          # Export config for the script
           export ENABLE_NODEJS="${ENABLE_NODEJS}"
           export ENABLE_PYTHON="${ENABLE_PYTHON}"
           export ENABLE_DOCKER="${ENABLE_DOCKER}"
           export ENABLE_JAVA="${ENABLE_JAVA}"
           export RUN_TESTS="${RUN_TESTS}"
           export RUN_SECURITY_AUDIT="${RUN_SECURITY_AUDIT}"
+          export DRY_RUN="${DRY_RUN}"
           export PUSH_TO_REMOTE="true"
           export CREATE_PULL_REQUEST="true"
           
@@ -157,6 +160,7 @@ jobs:
             CHANGELOG.md
             reports/
           retention-days: 30
+          if-no-files-found: ignore
 
       - name: Summary
         if: always()

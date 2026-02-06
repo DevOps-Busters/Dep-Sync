@@ -1,687 +1,361 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/Dep--Sync-v2.0-blue?style=for-the-badge&logo=github" alt="Version">
-  <img src="https://img.shields.io/badge/Shell-Bash-green?style=for-the-badge&logo=gnu-bash" alt="Shell">
-  <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License">
-</p>
+# Dep-Sync: Automated Dependency Management for Modern Projects
 
-<h1 align="center">🔄 Dep-Sync</h1>
+<div align="center">
 
-<p align="center">
-  <strong>Automated Dependency Updater</strong><br>
-  <em>Safe, parallel dependency updates for Node.js, Python, Docker & Java</em>
-</p>
+[![Node.js Version](https://img.shields.io/badge/Node.js-14%2B-brightgreen)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.1-blue)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)
 
-<p align="center">
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-features">Features</a> •
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-usage">Usage</a> •
-  <a href="#-configuration">Configuration</a>
-</p>
+**A production-grade, multi-language dependency updater and security auditor**
+
+[Quick Start](#quick-start)  [Documentation](#documentation)  [CLI Commands](#cli-commands)  [Architecture](#architecture)  [Contributing](#contributing)
+
+</div>
 
 ---
 
-## 🔒 Safety First
+## Overview
 
-> Dep-Sync creates **backup branches** before changes and runs **tests after updates** to ensure your code doesn't break.
+**Dep-Sync** is an enterprise-grade automation tool designed to keep dependencies up-to-date and secure across multiple language ecosystems. Built with TypeScript and following industry best practices, it provides a unified interface for dependency management across Node.js, Python, Docker, and Java projects.
+
+### Key Features
+
+ **Multi-Language Support**
+- Node.js/npm - Dependency updates via npm-check-updates
+- Python - Multiple package managers (pip, poetry, setup.py)
+- Docker - Base image updates and vulnerability scanning
+- Java - Maven and Gradle support
+
+ **Security First**
+- npm audit for Node.js vulnerabilities
+- pip-audit and safety for Python
+- Trivy for container scanning
+- OWASP dependency-check for Java
+
+ **Comprehensive Testing**
+- Automatic post-update test execution
+- Language-specific test runner detection
+- Detailed test report generation
+
+ **Git Integration**
+- Automatic branch creation
+- Commit with versioning
+- Pull request generation (GitHub CLI)
+- Change tracking and reporting
+
+ **Enterprise Architecture**
+- Domain-Driven Design (DDD)
+- Result/Response pattern for error handling
+- Railway-oriented programming principles
+- Comprehensive validation layer
+- Custom error types with recovery strategies
 
 ---
 
-## 🎯 Supported Languages
+## Quick Start
 
-| Language | Package Manager | Detection | Update Method | Security Tool |
-|:--------:|:---------------:|:---------:|:-------------:|:-------------:|
-| <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg" width="20"/> **Node.js** | npm | `package.json` | `npm-check-updates` | `npm audit` |
-| <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" width="20"/> **Python** | pip / Poetry | `requirements.txt` | `pip-tools` | `pip-audit` |
-| <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg" width="20"/> **Docker** | Docker Hub | `Dockerfile` | Docker Hub API | `trivy` |
-| <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg" width="20"/> **Java** | Maven / Gradle | `pom.xml` | `mvn versions:*` | OWASP |
+### Installation
 
----
-
-## 🚀 Quick Start
-
-```bash
+\`\`\`bash
 # Clone the repository
-git clone https://github.com/DevOps-Busters/Dep-Sync.git
+git clone https://github.com/apoorv-katiyar/Dep-Sync.git
 cd Dep-Sync
 
-# Make scripts executable
-chmod +x *.sh modules/*.sh
+# Install dependencies
+npm install
 
-# Run interactive CLI
-./cli.sh
+# Build the project
+npm run build
 
-# Or run directly
-./dependency-updater-main.sh
-```
+# Global installation (optional)
+npm install -g .
+\`\`\`
 
----
+### Basic Usage
 
-## ✨ Features
+\`\`\`bash
+# Scan project for supported languages
+dep-sync detect
 
-<table>
-<tr>
-<td width="50%">
+# View current configuration
+dep-sync status
 
-### 🛡️ Safety
-- ✅ Backup branches before changes
-- ✅ Test verification after updates
-- ✅ Security vulnerability scanning
-- ✅ Dry-run preview mode
-- ✅ Minor updates by default
+# Perform a dry-run update (preview changes)
+dep-sync update --dry-run
 
-</td>
-<td width="50%">
-
-### ⚡ Performance
-- ✅ Parallel execution
-- ✅ Configurable job limits
-- ✅ Smart project detection
-- ✅ Incremental updates
-- ✅ Caching support
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 📊 Reporting
-- ✅ JSON dependency report
-- ✅ CSV export
-- ✅ SBOM (CycloneDX)
-- ✅ Markdown summaries
-- ✅ Security audit reports
-
-</td>
-<td width="50%">
-
-### 🔄 Automation
-- ✅ GitHub Actions workflow
-- ✅ Scheduled updates
-- ✅ Auto PR creation
-- ✅ Label management
-- ✅ Reviewer assignment
-
-</td>
-</tr>
-</table>
+# Execute full update cycle
+dep-sync update --strategy minor
+\`\`\`
 
 ---
 
-## 🏗️ Architecture
+## CLI Commands
 
-### High-Level Overview
+### \`dep-sync update [options]\`
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          DEP-SYNC SYSTEM                            │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│   ENTRY POINTS              SHARED LIBRARY         CONFIGURATION   │
-│  ┌─────────────┐           ┌─────────────┐       ┌─────────────┐   │
-│  │  cli.sh     │──────────▶│lib/common.sh│◀──────│ ~/.depsync  │   │
-│  │  main.sh    │           │             │       │  .config    │   │
-│  │  Actions    │           │ • Colors    │       │             │   │
-│  └─────────────┘           │ • Logging   │       │ Environment │   │
-│                            │ • Defaults  │       │ Variables   │   │
-│                            └──────┬──────┘       └─────────────┘   │
-│                                   │                                 │
-│                                   ▼                                 │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                       MODULE LAYER                            │  │
-│  ├──────────────────────────────────────────────────────────────┤  │
-│  │                                                               │  │
-│  │  LANGUAGE MODULES              UTILITY MODULES                │  │
-│  │  ┌──────────────────┐          ┌──────────────────┐          │  │
-│  │  │ nodejs.sh        │          │ audit.sh         │          │  │
-│  │  │ python.sh        │          │ reports.sh       │          │  │
-│  │  │ docker.sh        │          │ config.sh        │          │  │
-│  │  │ java.sh          │          │ monorepo.sh      │          │  │
-│  │  └──────────────────┘          │ pr-enhance.sh    │          │  │
-│  │                                └──────────────────┘          │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                   │                                 │
-│                                   ▼                                 │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                       OUTPUT LAYER                            │  │
-│  │                                                               │  │
-│  │  📁 Git Branch    📝 Changelog    📊 Reports    🔗 Pull Request│  │
-│  │  📋 Logs          🔒 Audit Report                             │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+Perform complete dependency update cycle.
 
-### Module Dependency Graph
+**Options:**
+\`\`\`
+-s, --strategy <strategy>   patch|minor|major (default: minor)
+--skip-tests               Skip tests after update
+--skip-audit               Skip security audit
+--no-commit                Don'"'"'t commit changes
+--create-pr                Create pull request
+--dry-run                  Preview without modifying files
+-v, --verbose              Enable verbose logging
+\`\`\`
 
-```
-                         ┌─────────────────┐
-                         │  lib/common.sh  │
-                         │   (Foundation)  │
-                         └────────┬────────┘
-                                  │
-           ┌──────────────────────┼──────────────────────┐
-           │                      │                      │
-           ▼                      ▼                      ▼
-  ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-  │ main.sh         │   │ cli.sh          │   │ GitHub Actions  │
-  │ (Direct)        │   │ (Interactive)   │   │ (Automated)     │
-  └────────┬────────┘   └────────┬────────┘   └────────┬────────┘
-           │                     │                     │
-           └─────────────────────┼─────────────────────┘
-                                 │
-                                 ▼
-           ┌─────────────────────────────────────────────┐
-           │              MODULES LAYER                   │
-           ├─────────────────────────────────────────────┤
-           │                                             │
-           │  ┌─────────┐  ┌─────────┐  ┌─────────────┐ │
-           │  │config.sh│─▶│audit.sh │─▶│ reports.sh  │ │
-           │  └─────────┘  └────┬────┘  └─────────────┘ │
-           │                    │                        │
-           │    ┌───────────────┼───────────────┐       │
-           │    ▼               ▼               ▼       │
-           │ ┌────────┐   ┌──────────┐   ┌──────────┐  │
-           │ │nodejs  │   │ python   │   │ docker   │  │
-           │ │.sh     │   │ .sh      │   │ .sh      │  │
-           │ └────────┘   └──────────┘   └──────────┘  │
-           │                                           │
-           │ ┌────────┐   ┌──────────┐   ┌──────────┐ │
-           │ │java.sh │   │monorepo  │   │pr-enhance│ │
-           │ └────────┘   │.sh       │   │.sh       │ │
-           │              └──────────┘   └──────────┘ │
-           └─────────────────────────────────────────────┘
-```
+### \`dep-sync detect\`
+
+Scan and detect project languages.
+
+### \`dep-sync test\`
+
+Run tests for all detected languages.
+
+### \`dep-sync audit\`
+
+Perform security audits.
+
+### \`dep-sync status\`
+
+Display configuration and tool status.
+
+### \`dep-sync config [options]\`
+
+Manage configuration.
 
 ---
 
-## 🔄 Execution Flowchart
+## Configuration
 
-```
-┌─────────────┐
-│    START    │
-└──────┬──────┘
-       │
-       ▼
-┌──────────────────┐     ┌──────────────────┐
-│   CLI Mode?      │────▶│  Show Menu       │
-│   ./cli.sh       │     │  (Options 1-9)   │
-└──────────────────┘     └────────┬─────────┘
-       │                          │
-       ▼                          │
-┌──────────────────┐              │
-│  Direct Mode     │◀─────────────┘
-│  ./main.sh       │
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    INITIALIZATION PHASE                       │
-├──────────────────────────────────────────────────────────────┤
-│  1. Load Configuration (~/.depsync.config)                   │
-│  2. Load Shared Library (lib/common.sh)                      │
-│  3. Load All Modules (language + utility)                    │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                             ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    DETECTION PHASE                            │
-├──────────────────────────────────────────────────────────────┤
-│  For each language (nodejs, python, docker, java):           │
-│  • Check if enabled in config                                │
-│  • Run detect_*() function                                   │
-│  • Build list of projects to update                          │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-              ┌──────────────┴──────────────┐
-              ▼                             ▼
-     ┌─────────────────┐          ┌─────────────────┐
-     │ Projects Found  │          │  No Projects    │
-     └────────┬────────┘          │  → Exit         │
-              │                   └─────────────────┘
-              ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    SAFETY PHASE                               │
-├──────────────────────────────────────────────────────────────┤
-│  • Create backup branch (backup/main-YYYYMMDD-HHMMSS)        │
-│  • Quick security pre-check                                  │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                             ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    UPDATE PHASE                               │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌────────────────────┐    ┌────────────────────┐           │
-│  │ PARALLEL MODE      │ OR │ SEQUENTIAL MODE    │           │
-│  │ (All at once)      │    │ (One by one)       │           │
-│  └─────────┬──────────┘    └─────────┬──────────┘           │
-│            │                         │                       │
-│            └────────────┬────────────┘                       │
-│                         │                                    │
-│                         ▼                                    │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  FOR EACH LANGUAGE:                                   │   │
-│  │                                                       │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │   │
-│  │  │ 1. UPDATE   │─▶│ 2. TEST     │─▶│ 3. AUDIT    │   │   │
-│  │  │ update_*()  │  │ test_*()    │  │ audit_*()   │   │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘   │   │
-│  │         │                                             │   │
-│  │         ▼                                             │   │
-│  │  ┌─────────────┐                                      │   │
-│  │  │ 4. CHANGELOG│                                      │   │
-│  │  │ changelog_* │                                      │   │
-│  │  └─────────────┘                                      │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                              │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                             ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    REPORTING PHASE                            │
-├──────────────────────────────────────────────────────────────┤
-│  • Merge all changelogs                                      │
-│  • Generate reports (JSON, CSV, SBOM, Markdown)              │
-│  • Generate security audit report                            │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                             ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    GIT PHASE                                  │
-├──────────────────────────────────────────────────────────────┤
-│  • Check for changes                                         │
-│  • Create branch (deps/update-TIMESTAMP)                     │
-│  • Stage all changes (git add -A)                            │
-│  • Commit with message                                       │
-│  • Push to remote                                            │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                             ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    PR PHASE                                   │
-├──────────────────────────────────────────────────────────────┤
-│  • Generate PR title (with emoji)                            │
-│  • Generate PR body (changes, tests, audit)                  │
-│  • Add labels (dependencies, security, priority)             │
-│  • Assign reviewers                                          │
-│  • Create Pull Request via GitHub CLI                        │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                             ▼
-                    ┌─────────────┐
-                    │  COMPLETE   │
-                    └─────────────┘
-```
+Configuration via \`.env\` file:
 
----
-
-## 🔧 Module Interface
-
-Each language module implements a **standard interface**:
-
-| Function | Purpose | Example |
-|----------|---------|---------|
-| `detect_<lang>()` | Check if project exists | `detect_nodejs()` → finds `package.json` |
-| `update_<lang>()` | Update dependencies | `update_python()` → runs `pip-tools` |
-| `test_<lang>()` | Run project tests | `test_java()` → runs `mvn test` |
-| `audit_<lang>()` | Security scan | `audit_docker()` → runs `trivy` |
-| `changelog_<lang>()` | Generate changelog | Outputs markdown |
-
-```bash
-# Interface signature
-detect_<lang>()                    # Returns: 0=found, 1=not found
-update_<lang>(log_func, err_func)  # Returns: 0=success, 1=failure
-test_<lang>(log_func)              # Returns: 0=pass, 1=fail
-audit_<lang>(log_func)             # Returns: 0=clean, 1=issues
-changelog_<lang>()                 # Outputs: markdown text
-```
-
----
-
-## 📊 Data Flow
-
-```
-INPUT                    PROCESSING                   OUTPUT
-─────                    ──────────                   ──────
-
-┌─────────────┐
-│ Config File │──┐
-└─────────────┘  │
-                 ├──▶ LOAD CONFIG ──▶ Runtime Settings
-┌─────────────┐  │
-│ Environment │──┘
-└─────────────┘
-
-┌─────────────┐
-│ Project     │
-│ Files       │──▶ DETECT ──▶ Language List ──┐
-│ • package   │                                │
-│ • require   │                                │
-│ • Docker    │                                │
-│ • pom.xml   │                                │
-└─────────────┘                                │
-                                               ▼
-                                         ┌──────────┐
-                                         │  UPDATE  │
-                                         └────┬─────┘
-                                              │
-                    ┌─────────────────────────┼─────────────────────────┐
-                    │                         │                         │
-                    ▼                         ▼                         ▼
-             ┌────────────┐           ┌────────────┐           ┌────────────┐
-             │   TESTS    │           │   AUDIT    │           │ CHANGELOG  │
-             └─────┬──────┘           └─────┬──────┘           └─────┬──────┘
-                   │                        │                        │
-                   ▼                        ▼                        ▼
-             ┌────────────┐           ┌────────────┐           ┌────────────┐
-             │ Pass/Fail  │           │ Audit      │           │ CHANGELOG  │
-             │ Results    │           │ Report.txt │           │ .md        │
-             └────────────┘           └────────────┘           └────────────┘
-                                                                     │
-                                               ┌─────────────────────┘
-                                               ▼
-                                         ┌──────────┐
-                                         │ REPORTS  │
-                                         └────┬─────┘
-                                              │
-                    ┌─────────────────────────┼─────────────────────────┐
-                    │                         │                         │
-                    ▼                         ▼                         ▼
-             ┌────────────┐           ┌────────────┐           ┌────────────┐
-             │ deps.json  │           │ deps.csv   │           │ sbom.json  │
-             └────────────┘           └────────────┘           └────────────┘
-
-                                         ┌──────────┐
-                                         │   GIT    │
-                                         └────┬─────┘
-                                              │
-                                              ▼
-                                    ┌──────────────────┐
-                                    │   PULL REQUEST   │
-                                    │   with labels    │
-                                    └──────────────────┘
-```
-
----
-
-## 🔐 Security Workflow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    SECURITY PIPELINE                         │
-└─────────────────────────────────────────────────────────────┘
-
-  ┌──────────────────┐
-  │ 1. BACKUP        │  Create restore point
-  │    BRANCH        │  backup/main-YYYYMMDD
-  └────────┬─────────┘
-           │
-           ▼
-  ┌──────────────────┐
-  │ 2. PRE-CHECK     │  Existing vulnerabilities?
-  │    SCAN          │  quick_security_check()
-  └────────┬─────────┘
-           │
-           ▼
-  ┌──────────────────┐
-  │ 3. UPDATE        │  Minor versions (safe)
-  │    DEPS          │  Respects UPDATE_STRATEGY
-  └────────┬─────────┘
-           │
-           ▼
-  ┌──────────────────┐
-  │ 4. RUN           │  ✅ Pass → Continue
-  │    TESTS         │  ⚠️ Fail → Warning
-  └────────┬─────────┘
-           │
-           ▼
-  ┌──────────────────┐
-  │ 5. POST-UPDATE   │  Full security scan
-  │    AUDIT         │  All languages
-  └────────┬─────────┘
-           │
-           ▼
-  ┌──────────────────┐
-  │ 6. REPORT        │  security-audit-report.txt
-  │    GENERATION    │  Severity breakdown
-  └────────┬─────────┘
-           │
-           ▼
-  ┌──────────────────┐
-  │ 7. PR WITH       │  🔒 Security label
-  │    LABELS        │  High priority
-  └──────────────────┘
-
-  SEVERITY LEVELS:
-  ⛔ CRITICAL → Fail (if FAIL_ON_VULNERABILITY=true)
-  ⚠️ HIGH     → Warning + Label
-  ℹ️ MODERATE → Info in report
-  📝 LOW      → Log only
-```
-
----
-
-## 🎮 Interactive CLI
-
-```bash
-./cli.sh
-```
-
-```
-╔══════════════════════════════════════════════════════════════╗
-║              Dep-Sync - Interactive CLI v2.0                 ║
-╚══════════════════════════════════════════════════════════════╝
-
-  1) Run full update
-  2) Select languages to update
-  3) Dry-run (preview)
-  4) View configuration
-  5) Edit configuration
-  6) Security audit only
-  7) Generate reports
-  8) Check tools
-  9) Exit
-```
-
----
-
-## ⚙️ Configuration
-
-### Setup
-
-```bash
-cp .github/templates/config.example ~/.depsync.config
-```
-
-### Key Settings
-
-```bash
-# ═══════════════════════════════════════════════
-# LANGUAGES
-# ═══════════════════════════════════════════════
+\`\`\`env
+# Languages
 ENABLE_NODEJS=true
 ENABLE_PYTHON=true
 ENABLE_DOCKER=true
 ENABLE_JAVA=false
 
-# ═══════════════════════════════════════════════
-# SAFETY (Recommended: keep enabled)
-# ═══════════════════════════════════════════════
-RUN_TESTS=true
-RUN_SECURITY_AUDIT=true
-CREATE_BACKUP_BRANCH=true
-
-# ═══════════════════════════════════════════════
-# UPDATE STRATEGY
-# ═══════════════════════════════════════════════
-# patch = safest (x.y.Z only)
-# minor = recommended (x.Y.z)
-# major = breaking possible (X.y.z)
+# Strategy
 UPDATE_STRATEGY=minor
 
-# ═══════════════════════════════════════════════
-# GIT & PR
-# ═══════════════════════════════════════════════
+# Options
+RUN_TESTS=true
+RUN_SECURITY_AUDIT=true
 AUTO_COMMIT=true
-CREATE_PULL_REQUEST=true
-GIT_BRANCH_PREFIX=deps/update
+CREATE_PULL_REQUEST=false
 
-# ═══════════════════════════════════════════════
-# PERFORMANCE
-# ═══════════════════════════════════════════════
+# Git
+GIT_BRANCH_PREFIX=deps/update
+GIT_COMMIT_MESSAGE=chore(deps): update dependencies
+
+# Performance
 PARALLEL_EXECUTION=true
 MAX_PARALLEL_JOBS=4
-```
+\`\`\`
 
 ---
 
-## 🔄 GitHub Actions
+## Architecture
 
-### Workflow Triggers
+### Layered Design
 
-| Trigger | When |
-|---------|------|
-| **Schedule** | Every Monday at midnight UTC |
-| **Manual** | Actions → Run workflow |
+\`\`\`
 
-### Setup Variables
+   CLI Presentation Layer            
 
-Go to **Settings → Variables → Actions**:
+   Application Services              
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ENABLE_NODEJS` | `true` | Enable Node.js updates |
-| `ENABLE_PYTHON` | `true` | Enable Python updates |
-| `ENABLE_DOCKER` | `true` | Enable Docker updates |
-| `ENABLE_JAVA` | `false` | Enable Java updates |
-| `GIT_USER_NAME` | `github.actor` | Git commit author |
-| `GIT_USER_EMAIL` | Auto | Git commit email |
+   Domain Layer                      
 
-### Secrets (Private Registries)
+   Infrastructure Layer              
 
-| Secret | Description |
-|--------|-------------|
-| `NEXUS_URL` | Nexus registry URL |
-| `NEXUS_USER` | Nexus username |
-| `NEXUS_PASSWORD` | Nexus password/token |
+   Common Utilities                  
 
----
+\`\`\`
 
-## 📁 Project Structure
+### Design Patterns
 
-```
-Dep-Sync/
-│
-├── 📄 dependency-updater-main.sh   # Main orchestrator
-├── 📄 cli.sh                       # Interactive CLI
-│
-├── 📁 lib/
-│   └── 📄 common.sh                # Shared utilities
-│
-├── 📁 modules/
-│   ├── 📄 nodejs.sh                # Node.js/npm
-│   ├── 📄 python.sh                # Python/pip/Poetry
-│   ├── 📄 docker.sh                # Docker Hub & Nexus
-│   ├── 📄 java.sh                  # Maven/Gradle
-│   ├── 📄 audit.sh                 # Security audits
-│   ├── 📄 config.sh                # Configuration
-│   ├── 📄 reports.sh               # Report generation
-│   ├── 📄 monorepo.sh              # Monorepo support
-│   └── 📄 pr-enhance.sh            # PR enhancements
-│
-├── 📁 .github/
-│   ├── 📁 workflows/
-│   │   └── 📄 auto-update.yaml     # GitHub Actions
-│   └── 📁 templates/
-│       └── 📄 config.example       # Config template
-│
-└── 📄 README.md
-```
+1. **Domain-Driven Design (DDD)** - Business logic in domain layer
+2. **Result Pattern** - Railway-oriented programming for error handling
+3. **Dependency Injection** - Loose coupling and testability
+4. **Factory Pattern** - Language handler creation
+5. **Singleton Pattern** - Logger and Shell instances
+
+### Error Handling
+
+Custom error types with semantic meaning:
+
+\`\`\`typescript
+// Validation errors (400)
+throw new ValidationError('"'"'Invalid input'"'"');
+
+// Not found errors (404)
+throw new NotFoundError('"'"'Language'"'"', '"'"'rust'"'"');
+
+// Conflict errors (409)
+throw new ConflictError('"'"'Uncommitted changes found'"'"');
+
+// Command errors (500)
+throw new CommandExecutionError('"'"'npm install'"'"', exitCode, stderr);
+\`\`\`
 
 ---
 
-## 📋 Prerequisites
+## Project Structure
 
-### Required Tools
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| `bash` 4.0+ | Shell | Built-in |
-| `git` | Version control | `apt install git` |
-| `curl` | API calls | `apt install curl` |
-| `jq` | JSON parsing | `apt install jq` |
-
-### Language-Specific
-
-| Language | Requirements |
-|----------|-------------|
-| **Node.js** | Node 18+, `npm i -g npm-check-updates` |
-| **Python** | Python 3.8+, `pip install pip-tools pip-audit` |
-| **Docker** | Docker Engine, `trivy` (optional) |
-| **Java** | JDK 11+, Maven 3.6+ or Gradle 7+ |
+\`\`\`
+src/
+ cli.ts                  # CLI entry point
+ index.ts                # Exports
+ config/                 # Configuration
+ constants/              # Application constants
+ domain/                 # Business entities
+ errors/                 # Custom errors
+ validators/             # Input validation
+ common/                 # Result pattern
+ utils/                  # Utilities (Logger, Shell)
+ languages/              # Language handlers
+ managers/               # Manager services
+\`\`\`
 
 ---
 
-## 🛠️ Usage Examples
+## Supported Languages
 
-```bash
-# Full update (all languages)
-./dependency-updater-main.sh
-
-# Interactive mode
-./cli.sh
-
-# Preview changes (dry-run)
-./cli.sh  # Select option 3
-
-# Security audit only
-./cli.sh  # Select option 6
-
-# Selective update
-./cli.sh  # Select option 2
-
-# Generate reports
-./cli.sh  # Select option 7
-```
+| Language | Package Manager | Test Runner | Audit Tool |
+|----------|-----------------|-------------|------------|
+| Node.js | npm | npm test | npm audit |
+| Python | pip/poetry | pytest/unittest | pip-audit/safety |
+| Docker | - | docker build | Trivy |
+| Java | Maven/Gradle | mvn test / gradle test | OWASP check |
 
 ---
 
-## ❓ Troubleshooting
+## Development
 
-| Issue | Solution |
-|-------|----------|
-| `ncu: command not found` | `npm i -g npm-check-updates` |
-| `pip-audit not found` | `pip install pip-audit` |
-| `Permission denied` | `chmod +x *.sh modules/*.sh` |
-| `No changes detected` | Dependencies are up-to-date |
-| `Push failed` | Check git credentials / branch protection |
-| `PR creation failed` | Run `gh auth login` |
+### Build & Run
 
----
+\`\`\`bash
+npm run build         # Build TypeScript
+npm run dev          # Development mode
+npm run lint         # Check code quality
+npm run lint:fix     # Fix linting errors
+npm run format       # Format code
+\`\`\`
 
-## 🤝 Contributing
+### Code Quality
 
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing`)
-3. **Commit** changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to branch (`git push origin feature/amazing`)
-5. **Open** a Pull Request
+Dep-Sync uses:
+- **ESLint** - Code quality
+- **Prettier** - Formatting
+- **TypeScript** - Strict mode type checking
 
 ---
 
-## 📄 License
+## Troubleshooting
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+### Tool Not Found
+
+\`\`\`bash
+# Install missing tools
+# Git: https://git-scm.com/download
+# Node: https://nodejs.org
+# Docker: https://docs.docker.com/get-docker/
+\`\`\`
+
+### Debug Logging
+
+\`\`\`bash
+DEBUG=true npm run dev -- detect
+\`\`\`
 
 ---
 
-<p align="center">
-  <strong>Made with ❤️ by DevOps-Busters</strong><br>
-  <em>Automate your dependency updates safely!</em>
-</p>
+## Contributing
 
-<p align="center">
-  <a href="https://github.com/DevOps-Busters/Dep-Sync/issues">Report Bug</a> •
-  <a href="https://github.com/DevOps-Busters/Dep-Sync/issues">Request Feature</a>
-</p>
+1. Fork the repository
+2. Create feature branch (\`git checkout -b feature/amazing\`)
+3. Commit changes (\`git commit -am '"'"'feat: add feature'"'"'\`)
+4. Push to branch (\`git push origin feature/amazing\`)
+5. Open a Pull Request
+
+### Code Standards
+
+- Follow [Conventional Commits](https://www.conventionalcommits.org/)
+- Run \`npm run lint:fix\` before committing
+- Ensure tests pass
+- Update documentation
+
+---
+
+## Performance
+
+Typical execution times:
+
+| Operation | Duration |
+|-----------|----------|
+| Detect | 100-500ms |
+| Update (npm) | 5-30s |
+| Test | 10-60s |
+| Audit | 2-5s |
+| Full cycle | 20-120s |
+
+---
+
+## Security
+
+### Best Practices
+
+1. Review all updates before merging
+2. Test thoroughly after updates
+3. Review audit reports
+4. Use separate branches per language
+5. Pin major versions if needed
+
+### Report Security Issues
+
+Found a vulnerability? Please report privately to: security@dep-sync.local
+
+---
+
+## Roadmap
+
+### Upcoming Features
+
+- [ ] Web UI dashboard
+- [ ] REST API
+- [ ] Monorepo improvements
+- [ ] Custom hooks/plugins
+- [ ] Scheduled automation
+- [ ] Slack/Teams notifications
+- [ ] Docker image
+- [ ] Kubernetes Operator
+
+---
+
+## License
+
+MIT  2025 - DevOps-Busters
+
+---
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/apoorv-katiyar/Dep-Sync/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/apoorv-katiyar/Dep-Sync/discussions)
+- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md)
+
+---
+
+<div align="center">
+
+Made with  by the DevOps-Busters team
+
+**Thank you for using Dep-Sync!**
+
+</div>
