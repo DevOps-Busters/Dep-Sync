@@ -359,3 +359,4 @@ Made with  by the DevOps-Busters team
 **Thank you for using Dep-Sync!**
 
 </div>
+updated the reamde.md
